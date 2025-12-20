@@ -13,7 +13,7 @@ export function AnimatedWords({ text, className }: AnimatedWordsProps) {
   const ref = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
     target: ref,
-    offset: ["start 0.9", "start 0.25"],
+    offset: ["start end", "end start"],
   });
 
   const letters = text.split("");
@@ -37,7 +37,7 @@ export function AnimatedWords({ text, className }: AnimatedWordsProps) {
         }
 
         // Staggered rise-up for "Pipe"
-        const start = 0.1 * (index - 4);
+        const start = 0.1 * (index - 3);
         const end = 0.5 + 0.1 * (index - 4);
         const y = useTransform(scrollYProgress, [start, end], [30, 0]);
         const opacity = useTransform(scrollYProgress, [start, end], [0, 1]);
