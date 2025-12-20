@@ -3,6 +3,7 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/components/auth-provider';
 import { ThemeProvider } from '@/components/theme-provider';
+import { SmoothScroller } from '@/components/layout/smooth-scroller';
 
 export const metadata: Metadata = {
   title: 'PostPipe Pro',
@@ -31,7 +32,9 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            {children}
+            <SmoothScroller>
+              {children}
+            </SmoothScroller>
             <Toaster />
           </AuthProvider>
         </ThemeProvider>
