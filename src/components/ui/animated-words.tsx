@@ -13,7 +13,7 @@ export function AnimatedWords({ text, className }: AnimatedWordsProps) {
   const ref = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
     target: ref,
-    offset: ["start end", "end start"],
+    offset: ["start end", "end center"],
   });
 
   const letters = text.split("");
@@ -26,11 +26,11 @@ export function AnimatedWords({ text, className }: AnimatedWordsProps) {
     >
       {letters.map((letter, index) => {
         const y = useTransform(
-            scrollYProgress,
-            [0, 1],
-            letter === 'P' ? [0, -20] : [0, 0]
+          scrollYProgress,
+          [0, 1],
+          letter === 'P' ? [0, -150] : [0, 0]
         );
-        const opacity = useTransform(scrollYProgress, [0, 0.5, 0.7], [0, 0, 1]);
+        const opacity = useTransform(scrollYProgress, [0, 0.5], [0, 1]);
 
         return (
           <motion.span
