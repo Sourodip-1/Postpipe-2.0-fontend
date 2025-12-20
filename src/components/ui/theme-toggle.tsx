@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import { useTheme } from "next-themes"
 import { Moon, Sun } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -10,6 +11,17 @@ interface ThemeToggleProps {
 
 export function ThemeToggle({ className }: ThemeToggleProps) {
   const { resolvedTheme, setTheme } = useTheme()
+  const [mounted, setMounted] = React.useState(false)
+
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    // Render a placeholder or nothing on the server
+    return <div className={cn("flex w-16 h-8 p-1 rounded-full", className)} />
+  }
+  
   const isDark = resolvedTheme === "dark"
 
   const toggleTheme = () => {
