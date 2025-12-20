@@ -9,7 +9,7 @@ import { Button } from "../ui/button"
 import { AnimatedButton } from "../ui/animated-button"
 import { dotFlowItems } from "@/lib/dot-flow-data"
 import { MagneticText } from "../ui/morphing-cursor"
-import { RotatingWords } from "../ui/rotating-words"
+import { WordRotate } from "../ui/word-rotate"
 
 export function HeroParticles() {
   const { theme, systemTheme } = useTheme()
@@ -25,7 +25,13 @@ export function HeroParticles() {
     <div className="relative flex h-[70vh] min-h-[500px] w-full flex-col items-center justify-center overflow-hidden">
         <div className="z-10 flex flex-col items-center text-center gap-6 px-4">
             <MagneticText text="PostPipe" hoverText="2.0" className="font-body text-8xl md:text-9xl lg:text-[10rem] font-black" />
-            <RotatingWords words={["Component library", "Scaffold", "CLIs", "loader", "boilerplate"]} />
+            <div className="flex text-lg text-muted-foreground max-w-3xl">
+              The largest Next.js backend component&nbsp;
+              <WordRotate
+                words={["library", "Scaffold", "CLIs", "loader", "boilerplate"]}
+                className="text-lg text-muted-foreground"
+              />
+            </div>
             <div className="flex gap-4 items-center mt-4">
               <AnimatedButton>Get Started</AnimatedButton>
               <Button asChild variant="outline" className="h-auto bg-black border-zinc-800 text-white hover:bg-white hover:text-black px-8 py-[18.5px] text-sm uppercase font-black">
