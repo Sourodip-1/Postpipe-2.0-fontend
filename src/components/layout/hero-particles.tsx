@@ -7,7 +7,6 @@ import Link from "next/link"
 import { Particles } from "@/components/ui/particles"
 import { Button } from "../ui/button"
 import { AnimatedButton } from "../ui/animated-button"
-import { dotFlowItems } from "@/lib/dot-flow-data"
 import { MagneticText } from "../ui/morphing-cursor"
 import { WordRotate } from "../ui/word-rotate"
 
@@ -29,7 +28,7 @@ export function HeroParticles() {
               The largest Next.js backend component
               <WordRotate
                 words={["library", "Scaffold", "CLIs", "loader", "boilerplate"]}
-                className="text-lg text-foreground"
+                className="text-lg text-foreground dark:text-white ml-2"
               />
             </div>
             <div className="flex gap-4 items-center mt-4">
