@@ -42,8 +42,8 @@ export function HeroParticles() {
         className="absolute inset-0 -z-10"
         quantity={280}
         size={0.8}
-        staticity={50}
-        ease={60}
+        staticity={30}
+        ease={50}
         color={color}
         refresh
       />

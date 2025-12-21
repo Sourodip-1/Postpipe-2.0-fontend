@@ -53,7 +53,7 @@ export function AppFooter() {
 
         <div className="text-center mb-16 md:mb-24">
             <AnimatedWords 
-                text="PostPipe" 
+                text="PostPiPe" 
                 className="font-headline text-8xl md:text-[12rem] lg:text-[15rem] font-bold tracking-tighter leading-none" 
             />
         </div>

@@ -37,23 +37,23 @@ export function AnimatedWords({ text, className }: AnimatedWordsProps) {
           
           switch(index) {
             case 4: // P
-              yStart = 50; yEnd = -20;
+              yStart = 80; yEnd = -10;
               break;
             case 5: // i
-              yStart = 60; yEnd = -40;
+              yStart = 60; yEnd = 10;
               break;
             case 6: // p
-              yStart = 40; yEnd = -55;
+              yStart = 60; yEnd = -20;
               break;
             case 7: // e
-              yStart = 70; yEnd = -35;
+              yStart = 70; yEnd = -80;
               break;
             default:
               yStart = 0; yEnd = 0;
           }
 
           y = useTransform(scrollYProgress, [start, end], [yStart, yEnd]);
-          opacity = useTransform(scrollYProgress, [start, end], [0.5, 1]);
+          opacity = useTransform(scrollYProgress, [start, end], [0.9, 1]);
         }
         
         return (
