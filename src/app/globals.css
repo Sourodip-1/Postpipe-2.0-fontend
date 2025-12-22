@@ -95,7 +95,7 @@
 
 @layer utilities {
   .btn-31 {
-    @apply relative overflow-hidden;
+    @apply relative overflow-hidden bg-zinc-950 text-white;
   }
   .btn-31:before {
     --progress: 100%;
