@@ -33,7 +33,7 @@ export function HeroParticles() {
             </div>
             <div className="flex gap-4 items-center mt-4">
               <AnimatedButton>Get Started</AnimatedButton>
-              <Button asChild variant="outline" className="h-auto bg-black border-zinc-800 text-white hover:bg-white hover:text-black px-8 py-[18.5px] text-sm uppercase font-black">
+              <Button asChild variant="outline" className="h-auto bg-black border-zinc-800 text-white hover:bg-foreground hover:text-background px-8 py-[18.5px] text-sm uppercase font-black">
                 <Link href="#features">Learn More</Link>
               </Button>
             </div>
