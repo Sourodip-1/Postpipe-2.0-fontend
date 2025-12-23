@@ -18,7 +18,7 @@ export function Header2() {
 
 	const links = [
 		{ href: "/explore", label: "Dynamic" },
-		{ href: "#static", label: "Static" },
+		{ href: "/static", label: "Static" },
 		{ href: "/dashboard/workflows", label: "Workflows" },
 		{ href: "#docs", label: "Docs" },
 	];

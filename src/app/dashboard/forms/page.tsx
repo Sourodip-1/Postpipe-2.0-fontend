@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from 'next/link';
 import {
   Table,
   TableBody,
@@ -28,7 +29,8 @@ import {
   Eye,
   PauseCircle,
   PlayCircle,
-  CopyPlus
+  CopyPlus,
+  Trash2
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -36,7 +38,7 @@ import { cn } from "@/lib/utils";
 type Form = {
   id: string;
   name: string;
-  targetDb: string;
+  connectorName: string;
   submissions: number;
   lastSubmission: string;
   status: "Live" | "Paused";
@@ -46,7 +48,7 @@ const INITIAL_FORMS: Form[] = [
   {
     id: "f1",
     name: "Contact Us",
-    targetDb: "PostPipe Auth (MongoDB)",
+    connectorName: "Primary Prod",
     submissions: 45,
     lastSubmission: "10 mins ago",
     status: "Live",
@@ -54,7 +56,7 @@ const INITIAL_FORMS: Form[] = [
   {
     id: "f2",
     name: "Waitlist Signup",
-    targetDb: "E-commerce V1 (Postgres)",
+    connectorName: "Dev Local",
     submissions: 1203,
     lastSubmission: "1 min ago",
     status: "Live",
@@ -62,7 +64,7 @@ const INITIAL_FORMS: Form[] = [
   {
     id: "f3",
     name: "Customer Feedback",
-    targetDb: "Legacy Blog (MongoDB)",
+    connectorName: "Primary Prod",
     submissions: 12,
     lastSubmission: "3 days ago",
     status: "Paused",
@@ -83,14 +85,14 @@ export default function FormsPage() {
     }));
   };
 
+  const deleteForm = (id: string) => {
+    setForms(prev => prev.filter(f => f.id !== id));
+    toast({ title: "Form Deleted", description: "The form has been permanently removed.", variant: "destructive" });
+  };
+
   const copyEmbed = (id: string) => {
     navigator.clipboard.writeText(`<iframe src="https://forms.postpipe.dev/embed/${id}" width="100%" height="500" frameborder="0"></iframe>`);
     toast({ title: "Embed Code Copied", description: "Paste this into your website HTML." });
-  };
-
-  const copyEndpoint = (id: string) => {
-    navigator.clipboard.writeText(`https://api.postpipe.dev/v1/forms/${id}/submit`);
-    toast({ title: "Endpoint URL Copied", description: "Use this for custom frontend submissions." });
   };
 
   return (
@@ -102,12 +104,14 @@ export default function FormsPage() {
             Manage your backendless forms and connections.
           </p>
         </div>
-        <RainbowButton className="h-9 px-4 text-xs text-white">
-          <Plus className="mr-2 h-3.5 w-3.5" />
-          <span className="whitespace-pre-wrap text-center font-medium leading-none tracking-tight">
-            New Form
-          </span>
-        </RainbowButton>
+        <Link href="/dashboard/forms/new">
+          <RainbowButton className="h-9 px-4 text-xs text-white">
+            <Plus className="mr-2 h-3.5 w-3.5" />
+            <span className="whitespace-pre-wrap text-center font-medium leading-none tracking-tight">
+              New Form
+            </span>
+          </RainbowButton>
+        </Link>
       </div>
 
       <div className="rounded-md border">
@@ -115,7 +119,7 @@ export default function FormsPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Form Name</TableHead>
-              <TableHead>Target Database</TableHead>
+              <TableHead>Linked Connector</TableHead>
               <TableHead className="text-right">Submissions</TableHead>
               <TableHead>Last Submission</TableHead>
               <TableHead>Status</TableHead>
@@ -126,7 +130,12 @@ export default function FormsPage() {
             {forms.map((form) => (
               <TableRow key={form.id}>
                 <TableCell className="font-medium">{form.name}</TableCell>
-                <TableCell className="text-muted-foreground">{form.targetDb}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  <div className="flex items-center gap-1.5">
+                    <div className="size-2 rounded-full bg-green-500 animate-pulse" />
+                    {form.connectorName}
+                  </div>
+                </TableCell>
                 <TableCell className="text-right">{form.submissions.toLocaleString()}</TableCell>
                 <TableCell className="text-muted-foreground">{form.lastSubmission}</TableCell>
                 <TableCell>
@@ -144,15 +153,14 @@ export default function FormsPage() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel>Form Actions</DropdownMenuLabel>
-                      <DropdownMenuItem onClick={() => toast({ description: "Opening submissions table..." })}>
-                        <Eye className="mr-2 h-4 w-4" /> View Submissions
-                      </DropdownMenuItem>
+                      <Link href={`/dashboard/forms/${form.id}/submissions`}>
+                        <DropdownMenuItem>
+                          <Eye className="mr-2 h-4 w-4" /> View Submissions
+                        </DropdownMenuItem>
+                      </Link>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => copyEmbed(form.id)}>
                         <Code className="mr-2 h-4 w-4" /> Copy Embed HTML
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => copyEndpoint(form.id)}>
-                        <Copy className="mr-2 h-4 w-4" /> Copy Endpoint URL
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => toast({ description: "Form duplicated" })}>
                         <CopyPlus className="mr-2 h-4 w-4" /> Duplicate Form
@@ -168,6 +176,10 @@ export default function FormsPage() {
                             <PlayCircle className="mr-2 h-4 w-4 text-green-500" /> <span className="text-green-500">Resume Form</span>
                           </>
                         )}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => deleteForm(form.id)} className="text-destructive focus:text-destructive">
+                        <Trash2 className="mr-2 h-4 w-4" /> Delete Form
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

@@ -95,7 +95,7 @@ export default function DashboardPage() {
                 <h2 className="mb-4 text-lg font-semibold">Quick Actions</h2>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <Button asChild variant="outline" className="h-auto flex-col items-start gap-2 p-4">
-                        <Link href="/dashboard/systems/new">
+                        <Link href="/explore">
                             <div className="rounded-full bg-primary/10 p-2 text-primary">
                                 <Server className="h-5 w-5" />
                             </div>
@@ -119,7 +119,7 @@ export default function DashboardPage() {
                     </Button>
 
                     <Button asChild variant="outline" className="h-auto flex-col items-start gap-2 p-4">
-                        <Link href="/dashboard/connectors/new">
+                        <Link href="/dashboard/connectors">
                             <div className="rounded-full bg-amber-500/10 p-2 text-amber-500">
                                 <Zap className="h-5 w-5" />
                             </div>
