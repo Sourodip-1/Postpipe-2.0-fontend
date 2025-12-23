@@ -10,6 +10,7 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { RainbowButton } from "@/components/ui/rainbow-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -104,10 +105,10 @@ export default function ConnectorsPage() {
                         Manage access keys for your PostPipe integrations.
                     </p>
                 </div>
-                <Button>
-                    <ShieldCheck className="mr-2 h-4 w-4" />
-                    New Connector
-                </Button>
+                <RainbowButton className="h-9 px-4 text-xs rounded-none text-white bg-[#181818]">
+                    <ShieldCheck className="mr-2 h-3.5 w-3.5" />
+                    <span className="whitespace-pre-wrap text-center font-medium leading-none tracking-tight">New Connector</span>
+                </RainbowButton>
             </div>
 
             <Alert variant="default" className="bg-amber-500/10 text-amber-600 border-amber-500/20">

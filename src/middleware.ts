@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-const PROTECTED_ROUTES = ['/dashboard', '/forms', '/workflows'];
+const PROTECTED_ROUTES = ['/dashboard', '/forms', '/workflows', '/explore'];
 const AUTH_COOKIE_NAME = 'postpipe_auth';
 
 export function middleware(request: NextRequest) {
@@ -33,5 +33,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/login', '/forms', '/workflows'],
+  matcher: ['/dashboard/:path*', '/login', '/forms', '/workflows', '/explore'],
 }

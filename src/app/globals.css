@@ -40,11 +40,16 @@
     --sidebar-border: 0 0% 89.8%;
     --sidebar-ring: 333 79% 55%;
 
-    --color-1: 279 69% 61%;
-    --color-2: 340 75% 55%;
-    --color-3: 210 100% 63%;
-    --color-4: 190 100% 63%;
-    --color-5: 260 80% 60%;
+    --color-1: 225 95% 65%;
+    /* Purple */
+    --color-2: 230 95% 65%;
+    /* Indigo */
+    --color-3: 240 95% 65%;
+    /* Deep Blue */
+    --color-4: 245 95% 65%;
+    /* Blue */
+    --color-5: 250 95% 65%;
+    /* Violet */
   }
 
   .dark {
