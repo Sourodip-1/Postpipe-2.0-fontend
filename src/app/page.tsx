@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
@@ -42,6 +43,10 @@ const features = [
     description: 'Secure authentication across all your PostPipe services for a seamless user experience.',
   },
 ];
+
+export const metadata: Metadata = {
+  title: 'Home',
+};
 
 export default function Home() {
   return (

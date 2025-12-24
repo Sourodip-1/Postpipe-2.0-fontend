@@ -8,8 +8,14 @@ import { Header2 } from '@/components/ui/header-2';
 import { AnimatedFooter } from '@/components/layout/animated-footer';
 
 export const metadata: Metadata = {
-  title: 'PostPipe Pro',
-  description: 'Build forms and workflows with agentic AI.',
+  title: {
+    template: 'PostPipe | %s',
+    default: 'PostPipe',
+  },
+  description: 'Largest NextJS Backend Library and Static Ingetst System.',
+  icons: {
+    icon: '/PostPipe.ico',
+  },
 };
 
 export default function RootLayout({

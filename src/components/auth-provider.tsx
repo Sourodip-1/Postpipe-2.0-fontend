@@ -2,12 +2,14 @@
 
 import React, { createContext, useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { signOut } from "@/lib/auth/actions";
 
 const AUTH_COOKIE_NAME = "postpipe_auth";
 
 type User = {
   name: string;
   email: string;
+  image?: string;
 };
 
 export type AuthContextType = {
@@ -16,6 +18,7 @@ export type AuthContextType = {
   login: (email: string) => void;
   logout: () => void;
   loading: boolean;
+  refreshSession?: () => void;
 };
 
 export const AuthContext = createContext<AuthContextType | null>(null);
@@ -26,31 +29,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  useEffect(() => {
-    const checkAuth = () => {
-      const cookie = document.cookie.split('; ').find(row => row.startsWith(`${AUTH_COOKIE_NAME}=`));
-      if (cookie) {
-        const email = cookie.split('=')[1];
-        setUser({ name: "Demo User", email: decodeURIComponent(email) });
+  const fetchUser = async () => {
+    try {
+      const res = await fetch('/api/auth/me');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user) {
+          setUser(data.user);
+        } else {
+          setUser(null);
+        }
       } else {
         setUser(null);
       }
+    } catch (error) {
+      console.error("Failed to fetch user session", error);
+      setUser(null);
+    } finally {
       setLoading(false);
-    };
-    checkAuth();
-  }, [pathname]);
+    }
+  };
+
+  useEffect(() => {
+    fetchUser();
+  }, [pathname]); // Re-check on route change if needed, or better, expose refresh
 
   const login = (email: string) => {
-    document.cookie = `${AUTH_COOKIE_NAME}=${encodeURIComponent(email)}; path=/; max-age=86400`; // 1 day
-    const newUser = { name: "Demo User", email };
-    setUser(newUser);
+    // Legacy cookie setting - server actions usually handle the insecure cookies or the server-side cookie
+    // But we'll keep it for now if other things depend on it.
+    // However, the main thing is to refresh the user state.
+    document.cookie = `${AUTH_COOKIE_NAME}=${encodeURIComponent(email)}; path=/; max-age=86400`;
+    fetchUser(); // Refresh user data immediately
     router.push("/dashboard/workflows");
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await signOut();
     document.cookie = `${AUTH_COOKIE_NAME}=; path=/; max-age=-1`;
     setUser(null);
     router.push("/login");
+  };
+
+  // Function to manually refresh session (useful after profile update)
+  const refreshSession = () => {
+    fetchUser();
   };
 
   const value = {
@@ -59,6 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     login,
     logout,
     loading,
+    refreshSession, // Expose this
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
