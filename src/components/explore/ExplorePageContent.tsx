@@ -1,9 +1,11 @@
 "use client"
 
 import { ExploreCard } from "./ExploreCard"
+import { ExploreModal } from "./ExploreModal"
 import { Button } from "@/components/ui/button"
 import { RainbowButton } from "@/components/ui/rainbow-button"
 import { ChevronRight } from "lucide-react"
+import * as React from "react"
 
 const MOCK_ITEMS = [
     {
@@ -45,6 +47,8 @@ const MOCK_ITEMS = [
 ]
 
 export function ExplorePageContent() {
+    const [selectedItem, setSelectedItem] = React.useState<typeof MOCK_ITEMS[0] | null>(null)
+
     return (
         <div className="flex-1 space-y-8 p-8 pt-6">
             <div className="flex items-center justify-between space-y-2">
@@ -65,7 +69,7 @@ export function ExplorePageContent() {
                 </div>
                 <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {MOCK_ITEMS.slice(0, 4).map((item, i) => (
-                        <ExploreCard key={i} {...item} />
+                        <ExploreCard key={i} {...item} onClick={() => setSelectedItem(item)} />
                     ))}
                 </div>
             </section>
@@ -79,10 +83,16 @@ export function ExplorePageContent() {
                 </div>
                 <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {MOCK_ITEMS.slice(2, 6).map((item, i) => (
-                        <ExploreCard key={i} {...item} />
+                        <ExploreCard key={i} {...item} onClick={() => setSelectedItem(item)} />
                     ))}
                 </div>
             </section>
+
+            <ExploreModal
+                open={!!selectedItem}
+                onOpenChange={(open: boolean) => !open && setSelectedItem(null)}
+                item={selectedItem}
+            />
         </div>
     )
 }

@@ -16,11 +16,12 @@ interface ExploreCardProps {
     image: string
     tags?: string[]
     className?: string
+    onClick?: () => void
 }
 
-export function ExploreCard({ title, author, image, tags, className }: ExploreCardProps) {
+export function ExploreCard({ title, author, image, tags, className, onClick }: ExploreCardProps) {
     return (
-        <Card className={cn("overflow-hidden border-border/50 bg-card hover:border-primary/50 transition-colors group cursor-pointer", className)}>
+        <Card onClick={onClick} className={cn("explore-card overflow-hidden border-border/50 bg-card hover:border-primary/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_6px_20px_-4px_hsl(var(--primary)/0.4)] group cursor-pointer", className)}>
             <div className="aspect-video relative overflow-hidden bg-muted/50">
                 {/* Helper for missing images */}
                 <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/20 text-4xl font-bold uppercase tracking-widest select-none">

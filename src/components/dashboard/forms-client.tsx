@@ -75,10 +75,14 @@ export default function FormsClient() {
     const [forms, setForms] = React.useState<Form[]>(INITIAL_FORMS);
 
     const toggleStatus = (id: string) => {
+        const form = forms.find(f => f.id === id);
+        if (!form) return;
+
+        const newStatus = form.status === 'Live' ? 'Paused' : 'Live';
+        toast({ description: `Form ${newStatus === 'Live' ? 'resumed' : 'paused'}` });
+
         setForms(prev => prev.map(f => {
             if (f.id === id) {
-                const newStatus = f.status === 'Live' ? 'Paused' : 'Live';
-                toast({ description: `Form ${newStatus === 'Live' ? 'resumed' : 'paused'}` });
                 return { ...f, status: newStatus };
             }
             return f;
@@ -139,14 +143,22 @@ export default function FormsClient() {
                                 <TableCell className="text-right">{form.submissions.toLocaleString()}</TableCell>
                                 <TableCell className="text-muted-foreground">{form.lastSubmission}</TableCell>
                                 <TableCell>
-                                    <Badge variant={form.status === 'Live' ? 'default' : 'secondary'} className={cn(form.status === 'Live' && "bg-green-500 hover:bg-green-600")}>
+                                    <div className={cn("inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium", form.status === 'Live' ? "text-foreground" : "text-muted-foreground")}>
+                                        {form.status === 'Live' ? (
+                                            <span className="relative flex h-2 w-2">
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                            </span>
+                                        ) : (
+                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
+                                        )}
                                         {form.status}
-                                    </Badge>
+                                    </div>
                                 </TableCell>
                                 <TableCell className="text-right">
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" className="h-8 w-8 p-0">
+                                            <Button variant="ghost" className="h-8 w-8 p-0 rounded-full hover:bg-[linear-gradient(90deg,hsl(var(--color-1)),hsl(var(--color-5)),hsl(var(--color-3)),hsl(var(--color-4)),hsl(var(--color-2)))] hover:bg-[length:200%] hover:animate-rainbow hover:text-white hover:shadow-[0_0_20px_hsl(var(--color-1))] hover:!bg-transparent data-[state=open]:!bg-transparent transition-all duration-300">
                                                 <span className="sr-only">Open menu</span>
                                                 <MoreHorizontal className="h-4 w-4" />
                                             </Button>

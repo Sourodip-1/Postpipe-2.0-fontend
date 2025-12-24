@@ -1,7 +1,6 @@
 "use client";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
-import { ExploreSidebar } from "@/components/explore/ExploreSidebar"
-import { ExploreHeader } from "@/components/explore/ExploreHeader"
+import { SidebarProvider } from "@/components/ui/sidebar"
+import { ExploreLayoutWrapper } from "@/components/explore/ExploreLayoutWrapper"
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -23,16 +22,10 @@ export default function ExploreLayout({
     if (loading) return null;
 
     return (
-        <SidebarProvider defaultOpen={false}>
-            <div className="flex min-h-screen w-full bg-background pt-16">
-                <ExploreSidebar collapsible="offcanvas" />
-                <SidebarInset>
-                    <ExploreHeader />
-                    <div className="flex-1">
-                        {children}
-                    </div>
-                </SidebarInset>
-            </div>
+        <SidebarProvider defaultOpen={true}>
+            <ExploreLayoutWrapper>
+                {children}
+            </ExploreLayoutWrapper>
         </SidebarProvider>
     )
 }
