@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-const PROTECTED_ROUTES = ['/dashboard', '/forms', '/workflows', '/explore'];
+const PROTECTED_ROUTES = ['/dashboard', '/forms', '/workflows', '/explore', '/static'];
 const AUTH_COOKIE_NAME = 'postpipe_auth';
 
 export function middleware(request: NextRequest) {
@@ -25,7 +25,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard/forms', request.url));
   }
   if (pathname === '/workflows') {
-     return NextResponse.redirect(new URL('/dashboard/workflows', request.url));
+    return NextResponse.redirect(new URL('/dashboard/workflows', request.url));
   }
 
 
@@ -33,5 +33,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/login', '/forms', '/workflows', '/explore'],
+  matcher: ['/dashboard/:path*', '/login', '/forms', '/workflows', '/explore', '/static'],
 }

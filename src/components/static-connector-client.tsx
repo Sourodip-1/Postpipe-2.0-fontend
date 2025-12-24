@@ -1,23 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Check, Copy, ExternalLink, Terminal, ArrowRight, ShieldCheck, Server } from "lucide-react";
+import { Check, Copy, ExternalLink, Terminal, ArrowRight, ShieldCheck, Server, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function StaticConnectorClient() {
+    const { user } = useAuth();
     const [copied, setCopied] = useState(false);
+    const [isGenerated, setIsGenerated] = useState(false);
     const command = "npx create-postpipe-connector";
+
+    useEffect(() => {
+        if (user?.email) {
+            const generated = localStorage.getItem(`postpipe_connector_generated_${user.email}`);
+            if (generated === 'true') {
+                setIsGenerated(true);
+            }
+        }
+    }, [user]);
 
     const handleCopy = () => {
         navigator.clipboard.writeText(command);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
+
+        if (user?.email) {
+            localStorage.setItem(`postpipe_connector_generated_${user.email}`, 'true');
+            setIsGenerated(true);
+        }
     };
 
     return (
@@ -46,42 +63,75 @@ export default function StaticConnectorClient() {
 
                     {/* Step 1: Deploy CLI */}
                     <div className="relative z-10 flex gap-6 mb-12">
-                        <div className="flex-shrink-0 w-12 h-12 md:w-16 md:h-16 rounded-full bg-background border flex items-center justify-center font-mono font-bold text-lg md:text-xl shadow-sm">
-                            1
+                        <div className={cn(
+                            "flex-shrink-0 w-12 h-12 md:w-16 md:h-16 rounded-full border flex items-center justify-center font-mono font-bold text-lg md:text-xl shadow-sm transition-colors",
+                            isGenerated ? "bg-green-500/10 border-green-500/20 text-green-500" : "bg-background"
+                        )}>
+                            {isGenerated ? <Check className="h-6 w-6" /> : "1"}
                         </div>
                         <div className="flex-1 pt-2">
                             <h3 className="text-xl font-semibold mb-2">Generate Connector Locally</h3>
-                            <p className="text-muted-foreground mb-6">
-                                Run this command locally to scaffold a new PostPipe connector project.
-                            </p>
 
-                            <div className="bg-zinc-950 rounded-lg border border-zinc-800 p-4 font-mono text-sm flex items-center justify-between group">
-                                <div className="flex items-center gap-3 text-zinc-100">
-                                    <Terminal className="h-4 w-4 text-zinc-500" />
-                                    <span>{command}</span>
+                            {isGenerated ? (
+                                <div className="bg-green-500/5 border border-green-500/10 rounded-lg p-4 flex items-center gap-3">
+                                    <Check className="h-5 w-5 text-green-500" />
+                                    <p className="text-muted-foreground">
+                                        You have already generated the connector command.
+                                    </p>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                            if (user?.email) {
+                                                localStorage.removeItem(`postpipe_connector_generated_${user.email}`);
+                                                setIsGenerated(false);
+                                            }
+                                        }}
+                                        className="ml-auto text-xs text-muted-foreground hover:text-foreground"
+                                    >
+                                        Reset
+                                    </Button>
                                 </div>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-zinc-500 hover:text-white hover:bg-zinc-800"
-                                    onClick={handleCopy}
-                                >
-                                    {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-                                </Button>
-                            </div>
+                            ) : (
+                                <>
+                                    <p className="text-muted-foreground mb-6">
+                                        Run this command locally to scaffold a new PostPipe connector project.
+                                    </p>
 
-                            <div className="flex gap-4 mt-6">
-                                <Button variant="outline" size="sm" className="gap-2 text-muted-foreground" asChild>
-                                    <Link href="https://vercel.com/docs/deployments/overview" target="_blank">
-                                        Vercel Deployment Docs <ExternalLink className="h-3 w-3" />
-                                    </Link>
-                                </Button>
-                                <Button variant="outline" size="sm" className="gap-2 text-muted-foreground" asChild>
-                                    <Link href="https://learn.microsoft.com/en-us/azure/app-service/quickstart-nodejs" target="_blank">
-                                        Azure Deployment Docs <ExternalLink className="h-3 w-3" />
-                                    </Link>
-                                </Button>
-                            </div>
+                                    <div className="bg-zinc-950 rounded-lg border border-zinc-800 p-4 font-mono text-sm flex items-center justify-between group">
+                                        <div className="flex items-center gap-3 text-zinc-100">
+                                            <Terminal className="h-4 w-4 text-zinc-500" />
+                                            <span>{command}</span>
+                                        </div>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-zinc-500 hover:text-white hover:bg-zinc-800"
+                                            onClick={handleCopy}
+                                        >
+                                            {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                                        </Button>
+                                    </div>
+                                </>
+                            )}
+
+
+                            {!isGenerated && (
+                                <div className="flex gap-4 mt-6">
+                                    <Button variant="outline" size="sm" className="gap-2 text-muted-foreground" asChild>
+                                        <Link href="https://vercel.com/docs/deployments/overview" target="_blank">
+                                            Vercel Deploy
+                                            <svg role="img" viewBox="0 0 24 24" className="h-3 w-3 fill-current" xmlns="http://www.w3.org/2000/svg"><title>Vercel</title><path d="M24 22.525H0l12-21.05 12 21.05z" /></svg>
+                                        </Link>
+                                    </Button>
+                                    <Button variant="outline" size="sm" className="gap-2 text-muted-foreground" asChild>
+                                        <Link href="https://en.wikipedia.org/wiki/Microsoft_Azure" target="_blank">
+                                            Azure Deploy
+                                            <img src="/Microsoft_Azure.logo.png" alt="Azure Logo" className="h-3 w-3 object-contain" />
+                                        </Link>
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     </div>
 
