@@ -1,33 +1,10 @@
 "use client"
 
 import * as React from "react"
-import {
-    Calculator,
-    Calendar,
-    CreditCard,
-    Settings,
-    Smile,
-    User,
-    Search,
-    Layout,
-    Layers,
-    Box,
-    Sparkles,
-    Image as ImageIcon,
-    Type,
-    MousePointer2
-} from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Search, CornerDownLeft } from "lucide-react"
+import { getTemplates, getExploreFilters } from "@/lib/actions/explore"
 
-import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
-    CommandSeparator,
-    CommandShortcut,
-} from "@/components/ui/command"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 
@@ -37,136 +14,150 @@ interface SearchPopupProps {
 }
 
 export function SearchPopup({ open, setOpen }: SearchPopupProps) {
+    const router = useRouter()
+    const [query, setQuery] = React.useState("")
+    const [templates, setTemplates] = React.useState<any[]>([])
+    const [categories, setCategories] = React.useState<string[]>([])
+    const [loading, setLoading] = React.useState(true)
+
+    React.useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true)
+            try {
+                const [t, f] = await Promise.all([
+                    getTemplates(),
+                    getExploreFilters()
+                ]);
+                setTemplates(t);
+                setCategories(f.categories);
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setLoading(false);
+            }
+        }
+        if (open) {
+            fetchData();
+        }
+    }, [open])
+
+    const handleSearch = () => {
+        if (!query.trim()) return;
+        const searchParams = new URLSearchParams(window.location.search);
+        searchParams.set("q", query);
+        router.push(`/explore?${searchParams.toString()}`);
+        setOpen(false);
+    }
+
+    const handleCategoryClick = (cat: string) => {
+        const searchParams = new URLSearchParams(window.location.search);
+        searchParams.set("category", cat);
+        router.push(`/explore?${searchParams.toString()}`);
+        setOpen(false);
+    }
+
+    const handleTemplateClick = (template: any) => {
+        const searchParams = new URLSearchParams(window.location.search);
+        searchParams.set("q", template.name);
+        router.push(`/explore?${searchParams.toString()}`);
+        setOpen(false);
+    }
+
+    const filteredTemplates = templates.filter(t => {
+        if (!query) return true;
+        const q = query.toLowerCase();
+        const matchName = t.name.toLowerCase().includes(q);
+        const matchTag = t.tags?.some((tag: string) => tag.toLowerCase().includes(q));
+        return matchName || matchTag;
+    });
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === "Enter") {
+            handleSearch();
+        }
+    }
+
     return (
         <Dialog open={open} onOpenChange={setOpen}>
-            <DialogContent className="overflow-hidden p-0 shadow-2xl bg-zinc-950 border-zinc-800 sm:rounded-2xl max-w-4xl max-h-[80vh]">
+            <DialogContent className="overflow-hidden p-0 shadow-2xl bg-zinc-950 border-zinc-800 sm:rounded-2xl max-w-4xl max-h-[85vh] [&>button]:hidden">
                 <DialogTitle className="sr-only">Search</DialogTitle>
-                <Command className="bg-transparent text-white h-full w-full flex flex-col [&_[cmdk-group-heading]]:px-4 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-zinc-500 [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-4 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-14 [&_[cmdk-item]]:px-3 [&_[cmdk-item]]:py-4 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
+                <div className="bg-transparent text-white h-full w-full flex flex-col">
 
                     <div className="flex items-center border-b border-zinc-800 px-3">
                         <Search className="mr-2 h-5 w-5 shrink-0 opacity-50 text-zinc-400" />
-                        <CommandInput
-                            placeholder="Search components, screens, themes..."
-                            className="flex h-14 w-full rounded-md bg-transparent py-3 outline-none placeholder:text-zinc-500 disabled:cursor-not-allowed disabled:opacity-50 text-base"
+                        <input
+                            autoFocus
+                            placeholder="Search templates by tags..."
+                            className="flex h-14 w-full bg-transparent py-3 outline-none placeholder:text-zinc-500 text-base"
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            onKeyDown={handleKeyDown}
                         />
-                    </div>
-
-                    <div className="flex items-center gap-2 p-4 pb-2 border-b border-zinc-800/50">
-                        <Button variant="secondary" size="sm" className="bg-zinc-800 text-zinc-100 hover:bg-zinc-700 h-8 rounded-full px-4 text-xs font-normal">
-                            <Layout className="mr-2 h-3.5 w-3.5" />
-                            Components
-                        </Button>
-                        <Button variant="ghost" size="sm" className="text-zinc-400 hover:text-zinc-100 h-8 px-4 text-xs font-normal hover:bg-zinc-900 rounded-full">
-                            Featured
-                        </Button>
-                        <Button variant="ghost" size="sm" className="text-zinc-400 hover:text-zinc-100 h-8 px-4 text-xs font-normal hover:bg-zinc-900 rounded-full">
-                            Newest
-                        </Button>
-                        <Button variant="ghost" size="sm" className="text-zinc-400 hover:text-zinc-100 h-8 px-4 text-xs font-normal hover:bg-zinc-900 rounded-full">
-                            Bookmarks
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="ml-2 h-8 text-xs text-muted-foreground hover:bg-zinc-200 hover:text-zinc-900 transition-colors"
+                            onClick={handleSearch}
+                        >
+                            Enter <CornerDownLeft className="ml-1.5 h-3 w-3" />
                         </Button>
                     </div>
 
-                    <CommandList className="max-h-[600px] overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
-                        <CommandEmpty className="text-zinc-500 text-sm py-12 text-center flex flex-col items-center gap-2">
-                            <Search className="h-8 w-8 opacity-20" />
-                            <p>No results found.</p>
-                        </CommandEmpty>
+                    <div className="flex items-center gap-2 p-4 pb-2 border-b border-zinc-800/50 overflow-x-auto no-scrollbar">
+                        {categories.slice(0, 6).map(cat => (
+                            <Button
+                                key={cat}
+                                variant="secondary"
+                                size="sm"
+                                className="bg-zinc-800 text-zinc-100 hover:bg-zinc-700 h-8 rounded-full px-4 text-xs font-normal shrink-0"
+                                onClick={() => handleCategoryClick(cat)}
+                            >
+                                {cat}
+                            </Button>
+                        ))}
+                    </div>
 
-                        <CommandGroup heading="Featured" className="[&_[cmdk-group-items]]:grid [&_[cmdk-group-items]]:grid-cols-2 md:[&_[cmdk-group-items]]:grid-cols-4 [&_[cmdk-group-items]]:gap-3 pb-6">
-                            <CommandItem onSelect={() => { }} className="cursor-pointer flex flex-col items-start gap-4 p-4 h-32 bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800/80 hover:border-zinc-700 rounded-xl transition-all group aria-selected:bg-zinc-800 aria-selected:border-zinc-700">
-                                <div className="p-2 bg-zinc-950 rounded-lg border border-zinc-900 group-hover:border-zinc-700 transition-colors">
-                                    <Layout className="h-5 w-5 text-indigo-400" />
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="font-medium text-zinc-200">Heroes</p>
-                                    <p className="text-xs text-zinc-500 line-clamp-1">Header sections for landing pages</p>
-                                </div>
-                            </CommandItem>
-
-                            <CommandItem onSelect={() => { }} className="cursor-pointer flex flex-col items-start gap-4 p-4 h-32 bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800/80 hover:border-zinc-700 rounded-xl transition-all group aria-selected:bg-zinc-800 aria-selected:border-zinc-700">
-                                <div className="p-2 bg-zinc-950 rounded-lg border border-zinc-900 group-hover:border-zinc-700 transition-colors">
-                                    <Layers className="h-5 w-5 text-pink-400" />
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="font-medium text-zinc-200">Backgrounds</p>
-                                    <p className="text-xs text-zinc-500 line-clamp-1">Animated patterns and gradients</p>
-                                </div>
-                            </CommandItem>
-
-                            <CommandItem onSelect={() => { }} className="cursor-pointer flex flex-col items-start gap-4 p-4 h-32 bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800/80 hover:border-zinc-700 rounded-xl transition-all group aria-selected:bg-zinc-800 aria-selected:border-zinc-700">
-                                <div className="p-2 bg-zinc-950 rounded-lg border border-zinc-900 group-hover:border-zinc-700 transition-colors">
-                                    <Box className="h-5 w-5 text-emerald-400" />
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="font-medium text-zinc-200">Features</p>
-                                    <p className="text-xs text-zinc-500 line-clamp-1">Feature grids and showcases</p>
-                                </div>
-                            </CommandItem>
-
-                            <CommandItem onSelect={() => { }} className="cursor-pointer flex flex-col items-start gap-4 p-4 h-32 bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800/80 hover:border-zinc-700 rounded-xl transition-all group aria-selected:bg-zinc-800 aria-selected:border-zinc-700">
-                                <div className="p-2 bg-zinc-950 rounded-lg border border-zinc-900 group-hover:border-zinc-700 transition-colors">
-                                    <Sparkles className="h-5 w-5 text-amber-400" />
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="font-medium text-zinc-200">Announcements</p>
-                                    <p className="text-xs text-zinc-500 line-clamp-1">Banners and tickers</p>
-                                </div>
-                            </CommandItem>
-                        </CommandGroup>
-
-                        <CommandGroup heading="Components" className="[&_[cmdk-group-items]]:grid [&_[cmdk-group-items]]:grid-cols-2 md:[&_[cmdk-group-items]]:grid-cols-4 [&_[cmdk-group-items]]:gap-3">
-                            <CommandItem onSelect={() => { }} className="cursor-pointer flex flex-col items-start gap-4 p-4 h-32 bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800/80 hover:border-zinc-700 rounded-xl transition-all group aria-selected:bg-zinc-800 aria-selected:border-zinc-700">
-                                <div className="p-2 bg-zinc-950 rounded-lg border border-zinc-900 group-hover:border-zinc-700 transition-colors">
-                                    <CreditCard className="h-5 w-5 text-cyan-400" />
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="font-medium text-zinc-200">Cards</p>
-                                    <p className="text-xs text-zinc-500 line-clamp-1">Interactive card layouts</p>
-                                </div>
-                            </CommandItem>
-                            <CommandItem onSelect={() => { }} className="cursor-pointer flex flex-col items-start gap-4 p-4 h-32 bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800/80 hover:border-zinc-700 rounded-xl transition-all group aria-selected:bg-zinc-800 aria-selected:border-zinc-700">
-                                <div className="p-2 bg-zinc-950 rounded-lg border border-zinc-900 group-hover:border-zinc-700 transition-colors">
-                                    <Smile className="h-5 w-5 text-violet-400" />
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="font-medium text-zinc-200">AI Chats</p>
-                                    <p className="text-xs text-zinc-500 line-clamp-1">Chat interfaces</p>
-                                </div>
-                            </CommandItem>
-                            <CommandItem onSelect={() => { }} className="cursor-pointer flex flex-col items-start gap-4 p-4 h-32 bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800/80 hover:border-zinc-700 rounded-xl transition-all group aria-selected:bg-zinc-800 aria-selected:border-zinc-700">
-                                <div className="p-2 bg-zinc-950 rounded-lg border border-zinc-900 group-hover:border-zinc-700 transition-colors">
-                                    <MousePointer2 className="h-5 w-5 text-rose-400" />
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="font-medium text-zinc-200">Buttons</p>
-                                    <p className="text-xs text-zinc-500 line-clamp-1">Interactive elements</p>
-                                </div>
-                            </CommandItem>
-                            <CommandItem onSelect={() => { }} className="cursor-pointer flex flex-col items-start gap-4 p-4 h-32 bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800/80 hover:border-zinc-700 rounded-xl transition-all group aria-selected:bg-zinc-800 aria-selected:border-zinc-700">
-                                <div className="p-2 bg-zinc-950 rounded-lg border border-zinc-900 group-hover:border-zinc-700 transition-colors">
-                                    <ImageIcon className="h-5 w-5 text-orange-400" />
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="font-medium text-zinc-200">Carousels</p>
-                                    <p className="text-xs text-zinc-500 line-clamp-1">Image sliders</p>
-                                </div>
-                            </CommandItem>
-                        </CommandGroup>
-
-                        <CommandSeparator className="bg-zinc-900 my-4" />
-
-                        <div className="flex items-center justify-between px-2 py-2">
-                            <div className="flex gap-2 text-xs text-zinc-500">
-                                <span>Contact support</span>
-                                <span>•</span>
-                                <span>Share feedback</span>
+                    <div className="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+                        {loading ? (
+                            <div className="text-center py-12 text-zinc-500">Loading...</div>
+                        ) : filteredTemplates.length === 0 ? (
+                            <div className="text-center py-12 text-zinc-500">No templates found.</div>
+                        ) : (
+                            <div className="grid grid-cols-3 gap-4 pb-6">
+                                {filteredTemplates.map(t => (
+                                    <div
+                                        key={t._id}
+                                        onClick={() => handleTemplateClick(t)}
+                                        className="cursor-pointer flex flex-col items-start gap-3 p-3 bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800/80 hover:border-zinc-700 rounded-xl transition-all group"
+                                    >
+                                        <div className="w-full aspect-[4/3] bg-zinc-950 rounded-lg border border-zinc-900 group-hover:border-zinc-700 transition-colors overflow-hidden relative">
+                                            {t.thumbnailUrl ? (
+                                                <img src={t.thumbnailUrl} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt={t.name} />
+                                            ) : (
+                                                <div className="w-full h-full bg-zinc-800 flex items-center justify-center text-zinc-700">
+                                                    <span className="text-xs">No Preview</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="space-y-1 w-full px-1">
+                                            <p className="font-medium text-zinc-200 truncate w-full">{t.name}</p>
+                                            <p className="text-xs text-zinc-500 line-clamp-1">
+                                                {t.tags?.join(", ")}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
+                        )}
 
+                        <div className="flex items-center justify-between px-2 py-2 mt-4 border-t border-zinc-800/50 pt-4">
+                            <div className="flex gap-2 text-xs text-zinc-500">
+                                <span>Press Enter to search all</span>
+                            </div>
                         </div>
 
-                    </CommandList>
-                </Command>
+                    </div>
+                </div>
             </DialogContent>
         </Dialog>
     )

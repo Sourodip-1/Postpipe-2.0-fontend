@@ -9,6 +9,9 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
+// Ensure you have a toaster or similar installed. If not, window.alert or console.log is fallback;
+// but better to use a simple toast if available. Using basic alert for now if toast not readily seen or assume shadcn's useToast.
+import { useToast } from "@/hooks/use-toast"
 
 interface ExploreModalProps {
     open: boolean
@@ -22,11 +25,35 @@ interface ExploreModalProps {
         }
         image: string
         tags?: string[]
+        cli?: string
+        aiPrompt?: string
+        npmPackageUrl?: string
     } | null
 }
 
 export function ExploreModal({ open, onOpenChange, item }: ExploreModalProps) {
+    const { toast } = useToast()
+
     if (!item) return null
+
+    const handleCopy = async (text: string | undefined, type: string) => {
+        if (!text) return;
+        try {
+            await navigator.clipboard.writeText(text);
+            toast({
+                title: "Copied!",
+                description: `${type} copied to clipboard.`,
+            });
+        } catch (err) {
+            console.error('Failed to copy', err);
+        }
+    }
+
+    const handleOpenPackage = () => {
+        if (item.npmPackageUrl) {
+            window.open(item.npmPackageUrl, '_blank');
+        }
+    }
 
     return (
         <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -54,12 +81,12 @@ export function ExploreModal({ open, onOpenChange, item }: ExploreModalProps) {
                                     {/* Header */}
                                     <div className="flex items-center justify-between border-b p-4 bg-background/50 backdrop-blur-md sticky top-0 z-10">
                                         <div className="flex items-center gap-3">
-                                            <div className="h-10 w-10 flex items-center justify-center rounded-lg bg-muted border">
-                                                {/* Icon placeholder or Avatar */}
-                                                <span className="text-lg font-bold">
+                                            <Avatar className="h-10 w-10 flex items-center justify-center rounded-lg border">
+                                                <AvatarImage src={item.author.avatar} alt={item.title} className="object-cover" />
+                                                <AvatarFallback className="rounded-lg bg-muted text-lg font-bold">
                                                     {item.title.substring(0, 2)}
-                                                </span>
-                                            </div>
+                                                </AvatarFallback>
+                                            </Avatar>
                                             <div>
                                                 <div className="flex items-center gap-2">
                                                     <Dialog.Title className="text-lg font-semibold leading-none">{item.title}</Dialog.Title>
@@ -75,22 +102,28 @@ export function ExploreModal({ open, onOpenChange, item }: ExploreModalProps) {
                                         <div className="flex items-center gap-2">
                                             {/* Toolbar Actions */}
                                             <div className="flex items-center gap-2 mr-2">
-                                                <Button variant="outline" size="sm" className="h-9 gap-2">
-                                                    <Terminal className="h-4 w-4" />
-                                                    <span className="font-medium text-xs">Copy CLI</span>
-                                                </Button>
-                                                <Button variant="outline" size="sm" className="h-9 gap-2">
-                                                    <ExternalLink className="h-4 w-4" />
-                                                    <span className="font-medium text-xs">Open Package</span>
-                                                </Button>
+                                                {item.cli && (
+                                                    <Button variant="outline" size="sm" className="h-9 gap-2" onClick={() => handleCopy(item.cli, "CLI command")}>
+                                                        <Terminal className="h-4 w-4" />
+                                                        <span className="font-medium text-xs">Copy CLI</span>
+                                                    </Button>
+                                                )}
+                                                {item.npmPackageUrl && (
+                                                    <Button variant="outline" size="sm" className="h-9 gap-2" onClick={handleOpenPackage}>
+                                                        <ExternalLink className="h-4 w-4" />
+                                                        <span className="font-medium text-xs">Open Package</span>
+                                                    </Button>
+                                                )}
                                             </div>
 
                                             <div className="h-6 w-px bg-border mx-2" />
 
-                                            <Button className="h-9 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 gap-2">
-                                                <Copy className="h-4 w-4" />
-                                                <span className="font-medium text-xs tracking-wide">COPY PROMPT</span>
-                                            </Button>
+                                            {item.aiPrompt && (
+                                                <Button className="h-9 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 gap-2" onClick={() => handleCopy(item.aiPrompt, "Prompt")}>
+                                                    <Copy className="h-4 w-4" />
+                                                    <span className="font-medium text-xs tracking-wide">COPY PROMPT</span>
+                                                </Button>
+                                            )}
 
                                             <Dialog.Close asChild>
                                                 <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full ml-1">
@@ -103,25 +136,57 @@ export function ExploreModal({ open, onOpenChange, item }: ExploreModalProps) {
 
                                     {/* Body / Preview Area */}
                                     <div className="relative flex-1 bg-black/95 overflow-hidden flex flex-col justify-center items-center p-8">
-                                        {/* Mock Preview Content */}
                                         <div className="w-full max-w-4xl aspect-[16/10] bg-zinc-900 rounded-lg border border-white/10 shadow-2xl flex items-center justify-center relative overflow-hidden group">
-                                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.1),rgba(255,255,255,0))]" />
+                                            {(() => {
+                                                const url = item.image;
+                                                const isVideo = url && (
+                                                    url.includes('jumpshare') ||
+                                                    url.includes('cloudfront') ||
+                                                    url.endsWith('.mp4') ||
+                                                    url.endsWith('.webm') ||
+                                                    !/\.(jpg|jpeg|png|gif|webp|svg)($|\?)/i.test(url)
+                                                );
 
-                                            {/* Placeholder for the actual component render */}
-                                            <div className="text-center space-y-4 relative z-10 p-8">
-                                                <h3 className="text-3xl font-light text-white tracking-widest">
-                                                    {item.title} Preview
-                                                </h3>
-                                                <p className="text-zinc-500 max-w-md mx-auto">
-                                                    Interactive preview would be rendered here.
-                                                </p>
-                                            </div>
+                                                if (isVideo) {
+                                                    return (
+                                                        <video
+                                                            src={item.image}
+                                                            className="w-full h-full object-cover"
+                                                            autoPlay
+                                                            muted
+                                                            loop
+                                                            playsInline
+                                                        />
+                                                    );
+                                                }
 
-                                            {/* Mock Interactive UI Elements in Preview */}
+                                                return (
+                                                    <div className="w-full h-full relative">
+                                                        {/* Fallback pattern background if no image, or render image */}
+                                                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.1),rgba(255,255,255,0))]" />
+                                                        {item.image && (
+                                                            <img
+                                                                src={item.image}
+                                                                alt={item.title}
+                                                                className="w-full h-full object-cover relative z-10"
+                                                            />
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
 
+                                            {/* Overlay for text if image is missing/broken? No, assuming valid URLs for now. */}
+                                            {!item.image && (
+                                                <div className="text-center space-y-4 relative z-10 p-8">
+                                                    <h3 className="text-3xl font-light text-white tracking-widest">
+                                                        {item.title} Preview
+                                                    </h3>
+                                                    <p className="text-zinc-500 max-w-md mx-auto">
+                                                        Preview not available.
+                                                    </p>
+                                                </div>
+                                            )}
                                         </div>
-
-                                        {/* Bottom Info Bar / Tabs? */}
                                     </div>
                                 </motion.div>
                             </div>
