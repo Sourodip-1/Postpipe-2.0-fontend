@@ -2,7 +2,14 @@
 
 import { createForm, getConnectors } from '../../lib/server-db';
 
+import { getSession } from '../../lib/auth/actions';
+
 export async function createFormAction(formData: FormData) {
+  const session = await getSession();
+  if (!session || !session.userId) {
+      return { error: 'Unauthorized' };
+  }
+
   const name = formData.get('name') as string;
   const connectorId = formData.get('connectorId') as string;
   const fieldsJson = formData.get('fields') as string;
@@ -19,7 +26,7 @@ export async function createFormAction(formData: FormData) {
   }
 
   try {
-     const form = await createForm(connectorId, name, fields);
+     const form = await createForm(connectorId, name, fields, session.userId);
      return { success: true, formId: form.id };
   } catch (e) {
       return { error: 'Failed to create form' };
@@ -27,10 +34,15 @@ export async function createFormAction(formData: FormData) {
 }
 
 export async function getConnectorsAction() {
-    const connectors = await getConnectors();
+    const session = await getSession();
+    if (!session || !session.userId) {
+        return [];
+    }
+
+    const connectors = await getConnectors(session.userId);
     return connectors.map((c: any) => ({
         ...c,
-        _id: c._id.toString(),
+        _id: c._id?.toString(), // Handle if _id exists (though it might not in subdoc)
         id: c.id?.toString() || '',
     }));
 }
