@@ -18,7 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { RainbowButton } from "@/components/ui/rainbow-button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-import { createFormAction, getConnectorsAction } from "@/app/actions/builder";
+import { createFormAction, getConnectorsAction, updateFormAction } from "@/app/actions/builder";
 import { useEffect } from "react";
 
 import {
@@ -48,6 +48,7 @@ type FormField = {
 
 type NewFormClientProps = {
     onBack?: () => void;
+    initialData?: any; // Form data for editing
 };
 
 // Sortable Item Component
@@ -135,15 +136,26 @@ function SortableField({
     );
 }
 
-export default function NewFormClient({ onBack }: NewFormClientProps) {
-    const [formName, setFormName] = useState("");
-    const [connector, setConnector] = useState("");
-    const [fields, setFields] = useState<FormField[]>([
-        { id: "1", label: "Full Name", type: "text", required: true },
-        { id: "2", label: "Email Address", type: "email", required: true },
-        { id: "3", label: "Message", type: "textarea", required: true },
-    ]);
-    const [generatedId, setGeneratedId] = useState<string | null>(null);
+export default function NewFormClient({ onBack, initialData }: NewFormClientProps) {
+    const [formName, setFormName] = useState(initialData?.name || "");
+    const [connector, setConnector] = useState(initialData?.connectorId || "");
+
+    // Convert fields from DB format ({name, type, required}) to Client format ({id, label, type, required})
+    const initialFields = initialData?.fields
+        ? initialData.fields.map((f: any, i: number) => ({
+            id: i.toString(),
+            label: f.name,
+            type: f.type,
+            required: f.required
+        }))
+        : [
+            { id: "1", label: "Full Name", type: "text", required: true },
+            { id: "2", label: "Email Address", type: "email", required: true },
+            { id: "3", label: "Message", type: "textarea", required: true },
+        ];
+
+    const [fields, setFields] = useState<FormField[]>(initialFields);
+    const [generatedId, setGeneratedId] = useState<string | null>(initialData?.id || null);
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -202,15 +214,27 @@ export default function NewFormClient({ onBack }: NewFormClientProps) {
         formData.append('fields', JSON.stringify(simplifiedFields));
 
         try {
-            const res = await createFormAction(formData);
-            if (res.error) {
-                toast({ title: "Error", description: res.error, variant: "destructive" });
+            let res;
+            if (initialData?.id) {
+                // Update existing
+                res = await updateFormAction(initialData.id, formData);
+                if (res.error) {
+                    toast({ title: "Error", description: res.error, variant: "destructive" });
+                } else {
+                    toast({ title: "Form Updated", description: "Your changes have been saved." });
+                }
             } else {
-                setGeneratedId(res.formId || '');
-                toast({ title: "Form Saved", description: "Your form is ready to embed." });
+                // Create new
+                res = await createFormAction(formData);
+                if (res.error) {
+                    toast({ title: "Error", description: res.error, variant: "destructive" });
+                } else {
+                    setGeneratedId(res.formId || '');
+                    toast({ title: "Form Saved", description: "Your form is ready to embed." });
+                }
             }
         } catch (e) {
-            toast({ title: "Error", description: "Failed to create form.", variant: "destructive" });
+            toast({ title: "Error", description: "Failed to save form.", variant: "destructive" });
         }
     };
 
@@ -249,13 +273,13 @@ ${fields.map(f => `      <div>
                     </Link>
                 )}
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Create New Form</h1>
+                    <h1 className="text-2xl font-bold tracking-tight">{initialData ? "Edit Form" : "Create New Form"}</h1>
                     <p className="text-muted-foreground text-sm">Design your form and connect it to a database.</p>
                 </div>
                 <div className="ml-auto flex gap-2">
                     <Button variant="outline" onClick={() => setFields([])}>Reset</Button>
                     <RainbowButton className="h-9 px-6" onClick={handleSave}>
-                        <Save className="mr-2 h-4 w-4" /> Save Form
+                        <Save className="mr-2 h-4 w-4" /> {initialData ? "Update Form" : "Save Form"}
                     </RainbowButton>
                 </div>
             </div>

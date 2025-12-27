@@ -173,6 +173,11 @@ export async function getForm(id: string): Promise<Form | undefined> {
   return res || undefined;
 }
 
+export async function updateForm(id: string, updates: Partial<Form>): Promise<void> {
+  const db = await getDB();
+  await db.collection('forms').updateOne({ id }, { $set: updates });
+}
+
 export async function deleteConnector(id: string): Promise<void> {
   const db = await getDB();
   // We need to pull from the array where this connector exists

@@ -27,6 +27,7 @@ import {
     Copy,
     Code,
     Eye,
+    Edit,
     PauseCircle,
     PlayCircle,
     CopyPlus,
@@ -43,6 +44,7 @@ type Form = {
     submissions: number;
     lastSubmission: string;
     status: "Live" | "Paused";
+    fields: any[]; // Store fields for embed generation
 };
 
 
@@ -60,6 +62,7 @@ export default function FormsClient({ initialForms = [] }: FormsClientProps) {
         submissions: 0, // Assuming 0 for now as we don't have submission count in DB yet
         lastSubmission: "Never",
         status: "Live",
+        fields: f.fields || []
     })));
 
     const toggleStatus = (id: string) => {
@@ -92,7 +95,19 @@ export default function FormsClient({ initialForms = [] }: FormsClientProps) {
     };
 
     const copyEmbed = (id: string) => {
-        navigator.clipboard.writeText(`<iframe src="https://forms.postpipe.dev/embed/${id}" width="100%" height="500" frameborder="0"></iframe>`);
+        const form = forms.find(f => f.id === id);
+        if (!form) return;
+
+        const embedCode = `
+<form action="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9002'}/api/public/submit/${id}" method="POST">
+${form.fields.map((f: any) => `  <div>
+    <label>${f.name}</label>
+    <input type="${f.type}" name="${f.name}" ${f.required ? 'required' : ''} />
+  </div>`).join('\n')}
+  <button type="submit">Submit</button>
+</form>`.trim();
+
+        navigator.clipboard.writeText(embedCode);
         toast({ title: "Embed Code Copied", description: "Paste this into your website HTML." });
     };
 
@@ -153,51 +168,64 @@ export default function FormsClient({ initialForms = [] }: FormsClientProps) {
                                     </div>
                                 </TableCell>
                                 <TableCell className="text-right">
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" className="h-8 w-8 p-0 rounded-full hover:bg-[linear-gradient(90deg,hsl(var(--color-1)),hsl(var(--color-5)),hsl(var(--color-3)),hsl(var(--color-4)),hsl(var(--color-2)))] hover:bg-[length:200%] hover:animate-rainbow hover:text-white hover:shadow-[0_0_20px_hsl(var(--color-1))] hover:!bg-transparent data-[state=open]:!bg-transparent transition-all duration-300">
-                                                <span className="sr-only">Open menu</span>
-                                                <MoreHorizontal className="h-4 w-4" />
+                                    <div className="flex items-center gap-1 justify-end">
+                                        <Link href={`/dashboard/forms/${form.id}/edit`}>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-transparent hover:text-white hover:scale-110 transition-all duration-300">
+                                                <Edit className="h-4 w-4" />
+                                                <span className="sr-only">Edit</span>
                                             </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                            <DropdownMenuLabel>Form Actions</DropdownMenuLabel>
-                                            <Link href={`/dashboard/forms/${form.id}/submissions`}>
-                                                <DropdownMenuItem>
-                                                    <Eye className="mr-2 h-4 w-4" /> View Submissions
+                                        </Link>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" className="h-8 w-8 p-0 rounded-full hover:bg-[linear-gradient(90deg,hsl(var(--color-1)),hsl(var(--color-5)),hsl(var(--color-3)),hsl(var(--color-4)),hsl(var(--color-2)))] hover:bg-[length:200%] hover:animate-rainbow hover:text-white hover:shadow-[0_0_20px_hsl(var(--color-1))] hover:!bg-transparent data-[state=open]:!bg-transparent transition-all duration-300">
+                                                    <span className="sr-only">Open menu</span>
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuLabel>Form Actions</DropdownMenuLabel>
+                                                <Link href={`/dashboard/forms/${form.id}/submissions`}>
+                                                    <DropdownMenuItem>
+                                                        <Eye className="mr-2 h-4 w-4" /> View Submissions
+                                                    </DropdownMenuItem>
+                                                </Link>
+                                                <Link href={`/dashboard/forms/${form.id}/edit`}>
+                                                    <DropdownMenuItem>
+                                                        <Edit className="mr-2 h-4 w-4" /> Edit Form
+                                                    </DropdownMenuItem>
+                                                </Link>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem onClick={() => copyEmbed(form.id)}>
+                                                    <Code className="mr-2 h-4 w-4" /> Copy Embed HTML
                                                 </DropdownMenuItem>
-                                            </Link>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem onClick={() => copyEmbed(form.id)}>
-                                                <Code className="mr-2 h-4 w-4" /> Copy Embed HTML
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => toast({ description: "Form duplicated" })}>
-                                                <CopyPlus className="mr-2 h-4 w-4" /> Duplicate Form
-                                            </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem onClick={() => toggleStatus(form.id)}>
-                                                {form.status === 'Live' ? (
-                                                    <>
-                                                        <PauseCircle className="mr-2 h-4 w-4 text-orange-500" /> <span className="text-orange-500">Pause Form</span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <PlayCircle className="mr-2 h-4 w-4 text-green-500" /> <span className="text-green-500">Resume Form</span>
-                                                    </>
-                                                )}
-                                            </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem onClick={() => deleteForm(form.id)} className="text-destructive focus:text-destructive">
-                                                <Trash2 className="mr-2 h-4 w-4" /> Delete Form
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
+                                                <DropdownMenuItem onClick={() => toast({ description: "Form duplicated" })}>
+                                                    <CopyPlus className="mr-2 h-4 w-4" /> Duplicate Form
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem onClick={() => toggleStatus(form.id)}>
+                                                    {form.status === 'Live' ? (
+                                                        <>
+                                                            <PauseCircle className="mr-2 h-4 w-4 text-orange-500" /> <span className="text-orange-500">Pause Form</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <PlayCircle className="mr-2 h-4 w-4 text-green-500" /> <span className="text-green-500">Resume Form</span>
+                                                        </>
+                                                    )}
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem onClick={() => deleteForm(form.id)} className="text-destructive focus:text-destructive">
+                                                    <Trash2 className="mr-2 h-4 w-4" /> Delete Form
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
                                 </TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
                 </Table>
             </div>
-        </div>
+        </div >
     );
 }
