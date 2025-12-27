@@ -1,6 +1,7 @@
 'use server';
 
 import { registerConnector } from '../../lib/server-db';
+import { getSession } from '../../lib/auth/actions';
 
 export async function registerConnectorAction(formData: FormData) {
   const url = formData.get('url') as string;
@@ -11,13 +12,18 @@ export async function registerConnectorAction(formData: FormData) {
   }
 
   try {
-     const connector = await registerConnector(url, name);
-     return { 
-         success: true, 
-         connectorId: connector.id, 
-         connectorSecret: connector.secret 
-     };
+    const session = await getSession();
+    if (!session || !session.userId) {
+      return { error: 'Unauthorized' };
+    }
+
+    const connector = await registerConnector(url, name, session.userId);
+    return {
+      success: true,
+      connectorId: connector.id,
+      connectorSecret: connector.secret
+    };
   } catch (e) {
-      return { error: 'Failed to register connector' };
+    return { error: 'Failed to register connector' };
   }
 }
