@@ -13,72 +13,82 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "@/hooks/use-toast";
 import NewFormClient from "@/components/dashboard/new-form-client";
+import { registerConnectorAction, finalizeConnectorAction } from "@/app/actions/register";
 
 export default function StaticConnectorClient() {
     const { user } = useAuth();
-    const [copied, setCopied] = useState(false);
-    const [isGenerated, setIsGenerated] = useState(false);
 
-    // New Registration State
-    const [isFullyRegistered, setIsFullyRegistered] = useState(false);
-    const [inputUrl, setInputUrl] = useState("");
-    const [isRegistering, setIsRegistering] = useState(false);
+    // State
+    const [step, setStep] = useState(1); // 1: Generate, 2: Deploy, 3: Connect
+    const [connectorName, setConnectorName] = useState("");
     const [connectorData, setConnectorData] = useState<{ id: string; secret: string } | null>(null);
+    const [deploymentUrl, setDeploymentUrl] = useState("");
+
+    const [isLoading, setIsLoading] = useState(false);
     const [showSecret, setShowSecret] = useState(false);
     const [showCreateForm, setShowCreateForm] = useState(false);
+    const [isDashboardReady, setIsDashboardReady] = useState(false);
 
-    const command = "npx create-postpipe-connector";
-
+    // Load state from local storage
     useEffect(() => {
         if (user?.email) {
-            const generated = localStorage.getItem(`postpipe_connector_generated_${user.email}`);
-            const registered = localStorage.getItem(`postpipe_connector_registered_${user.email}`);
-            const storedData = localStorage.getItem(`postpipe_connector_data_${user.email}`);
+            const storedStep = localStorage.getItem(`pp_setup_step_${user.email}`);
+            const storedData = localStorage.getItem(`pp_connector_data_${user.email}`);
 
-            if (generated === 'true') {
-                setIsGenerated(true);
-            }
-            if (registered === 'true') {
-                setIsFullyRegistered(true);
-            }
-            if (storedData) {
-                setConnectorData(JSON.parse(storedData));
-            }
+            if (storedStep) setStep(parseInt(storedStep));
+            if (storedData) setConnectorData(JSON.parse(storedData));
+            if (storedStep === "4") setIsDashboardReady(true);
         }
     }, [user]);
 
-    const handleCopy = () => {
-        navigator.clipboard.writeText(command);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-
+    // Persist state
+    const saveState = (newStep: number, data?: any) => {
         if (user?.email) {
-            localStorage.setItem(`postpipe_connector_generated_${user.email}`, 'true');
-            setIsGenerated(true);
+            localStorage.setItem(`pp_setup_step_${user.email}`, newStep.toString());
+            if (data) localStorage.setItem(`pp_connector_data_${user.email}`, JSON.stringify(data));
+        }
+        setStep(newStep);
+        if (data) setConnectorData(data);
+    };
+
+    // Step 1: Generate Credentials
+    const handleGenerate = async () => {
+        if (!connectorName) {
+            toast({ title: "Name Required", description: "Please give your connector a name.", variant: "destructive" });
+            return;
+        }
+
+        setIsLoading(true);
+        const FormDataObj = new FormData();
+        FormDataObj.append('name', connectorName);
+
+        const res = await registerConnectorAction(FormDataObj);
+        setIsLoading(false);
+
+        if (res.success && res.connectorId && res.connectorSecret) {
+            const data = { id: res.connectorId, secret: res.connectorSecret };
+            saveState(2, data);
+            toast({ title: "Credentials Generated", description: "Now copy them to Vercel." });
+        } else {
+            toast({ title: "Error", description: res.error || "Failed to generate", variant: "destructive" });
         }
     };
 
-    const handleRegister = () => {
-        if (!inputUrl) return;
+    // Step 3: Connect
+    const handleConnect = async () => {
+        if (!deploymentUrl || !connectorData) return;
 
-        setIsRegistering(true);
-        // Mock API Call
-        setTimeout(() => {
-            const newConnectorData = {
-                id: `conn_${Math.random().toString(36).substring(2, 10)}`,
-                secret: `sk_live_${Math.random().toString(36).substring(2)}`
-            };
-            setConnectorData(newConnectorData);
-            setIsRegistering(false);
+        setIsLoading(true);
+        const res = await finalizeConnectorAction(connectorData.id, deploymentUrl);
+        setIsLoading(false);
 
-            if (user?.email) {
-                localStorage.setItem(`postpipe_connector_registered_${user.email}`, 'true');
-                localStorage.setItem(`postpipe_connector_data_${user.email}`, JSON.stringify(newConnectorData));
-                setIsFullyRegistered(true);
-            }
-
-            toast({ title: "Connector Registered", description: "Your credentials have been generated." });
-        }, 1500);
+        if (res.success) {
+            saveState(4); // 4 = Complete
+            setIsDashboardReady(true);
+            toast({ title: "Connected!", description: "Your connector is live." });
+        } else {
+            toast({ title: "Connection Failed", description: res.error, variant: "destructive" });
+        }
     };
 
     const copyToClipboard = (text: string, label: string) => {
@@ -86,298 +96,181 @@ export default function StaticConnectorClient() {
         toast({ title: "Copied!", description: `${label} copied to clipboard.` });
     };
 
+    if (showCreateForm) {
+        return (
+            <div className="pt-20 px-8">
+                <NewFormClient onBack={() => setShowCreateForm(false)} />
+            </div>
+        );
+    }
+
     return (
         <div className="min-h-screen w-full bg-background text-foreground flex flex-col items-center pt-32 pb-12 px-4 sm:px-6 lg:px-8">
-
-            {/* SECTION 1: Title & Context */}
+            {/* Header */}
             <div className="max-w-3xl w-full text-center mb-12 space-y-4">
                 <Badge variant="outline" className="mb-2 bg-primary/10 text-primary border-primary/20">
-                    Prerequisite
+                    Setup Wizard
                 </Badge>
                 <h1 className="text-3xl md:text-4xl font-bold tracking-tight font-headline">
-                    Set up your PostPipe Connector
+                    Connect Your Database
                 </h1>
                 <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-                    PostPipe Static requires a connector deployed in your infrastructure.
-                    This connector owns your database credentials. <span className="text-foreground font-medium">PostPipe never sees them.</span>
+                    Three simple steps to deploy your private connector.
                 </p>
             </div>
 
-            <div className="max-w-3xl w-full space-y-8">
+            {/* Main Card */}
+            <div className="max-w-2xl w-full bg-card border rounded-xl shadow-sm overflow-hidden relative">
 
-                {!showCreateForm && (
-                    <div className="space-y-8">
+                {/* Progress Bar */}
+                <div className="absolute top-0 left-0 right-0 h-1 bg-muted">
+                    <div
+                        className="h-full bg-primary transition-all duration-500 ease-in-out"
+                        style={{ width: isDashboardReady ? '100%' : `${(step / 3) * 100}%` }}
+                    />
+                </div>
 
-                        {/* SECTION 2: Step-by-Step Setup */}
+                <div className="p-8 space-y-8">
 
-                        {/* Complete State Header */}
-                        {isFullyRegistered && (
-                            <div className="max-w-3xl w-full text-center mb-8">
-                                <div className="bg-green-500/5 border border-green-500/10 rounded-xl p-8 mb-8 animate-in fade-in zoom-in duration-300">
-                                    <div className="mx-auto w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center mb-4">
-                                        <Check className="h-6 w-6 text-green-500" />
-                                    </div>
-                                    <h3 className="text-xl font-bold mb-2">Connector Setup Complete</h3>
-                                    <p className="text-muted-foreground mb-6">
-                                        You have successfully configured your static connector.
-                                    </p>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                            if (user?.email) {
-                                                localStorage.removeItem(`postpipe_connector_registered_${user.email}`);
-                                                localStorage.removeItem(`postpipe_connector_data_${user.email}`);
-                                                setIsFullyRegistered(false);
-                                                setConnectorData(null);
-                                            }
-                                        }}
-                                        className="text-xs"
-                                    >
-                                        Reset Setup (Debug)
-                                    </Button>
-                                </div>
+                    {/* Step 1: Generate */}
+                    <div className={cn("space-y-4 transition-opacity duration-300", step !== 1 && "opacity-50 pointer-events-none hidden")}>
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold">1</div>
+                            <h3 className="text-xl font-semibold">Generate Credentials</h3>
+                        </div>
+                        <p className="text-muted-foreground pl-14">
+                            First, let's create a secure identity for your connector.
+                        </p>
+                        <div className="pl-14 space-y-4">
+                            <div className="grid gap-2">
+                                <label className="text-sm font-medium">Connector Name</label>
+                                <Input
+                                    placeholder="e.g. My Production DB"
+                                    value={connectorName}
+                                    onChange={e => setConnectorName(e.target.value)}
+                                />
                             </div>
-                        )}
+                            <Button onClick={handleGenerate} disabled={isLoading} className="w-full">
+                                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Generate Credentials"}
+                            </Button>
+                        </div>
+                    </div>
 
-                        <div className="relative">
-                            {/* Vertical Line - Only visible during setup steps 1 & 2 */}
-                            {!isFullyRegistered && (
-                                <div className="absolute left-6 top-4 bottom-4 w-px bg-border md:left-8 z-0"></div>
-                            )}
-
-                            {/* Step 1 & 2 - Only visible during setup */}
-                            {!isFullyRegistered && (
-                                <>
-                                    {/* Step 1: Deploy CLI */}
-                                    <div className="relative z-10 flex gap-6 mb-12">
-                                        <div className={cn(
-                                            "flex-shrink-0 w-12 h-12 md:w-16 md:h-16 rounded-full border flex items-center justify-center font-mono font-bold text-lg md:text-xl shadow-sm transition-colors",
-                                            isGenerated ? "bg-green-500/10 border-green-500/20 text-green-500" : "bg-background"
-                                        )}>
-                                            {isGenerated ? <Check className="h-6 w-6" /> : "1"}
-                                        </div>
-                                        <div className="flex-1 pt-2">
-                                            <h3 className="text-xl font-semibold mb-2">Generate Connector Locally</h3>
-
-                                            {isGenerated ? (
-                                                <div className="bg-green-500/5 border border-green-500/10 rounded-lg p-4 flex items-center gap-3">
-                                                    <Check className="h-5 w-5 text-green-500" />
-                                                    <p className="text-muted-foreground">
-                                                        You have already generated the connector command.
-                                                    </p>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => {
-                                                            if (user?.email) {
-                                                                localStorage.removeItem(`postpipe_connector_generated_${user.email}`);
-                                                                setIsGenerated(false);
-                                                            }
-                                                        }}
-                                                        className="ml-auto text-xs text-muted-foreground hover:text-foreground"
-                                                    >
-                                                        Reset
-                                                    </Button>
-                                                </div>
-                                            ) : (
-                                                <>
-                                                    <p className="text-muted-foreground mb-6">
-                                                        Run this command locally to scaffold a new PostPipe connector project.
-                                                    </p>
-
-                                                    <div className="bg-zinc-950 rounded-lg border border-zinc-800 p-4 font-mono text-sm flex items-center justify-between group">
-                                                        <div className="flex items-center gap-3 text-zinc-100">
-                                                            <Terminal className="h-4 w-4 text-zinc-500" />
-                                                            <span>{command}</span>
-                                                        </div>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-8 w-8 text-zinc-500 hover:text-white hover:bg-zinc-800"
-                                                            onClick={handleCopy}
-                                                        >
-                                                            {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-                                                        </Button>
-                                                    </div>
-                                                </>
-                                            )}
-
-
-                                            {!isGenerated && (
-                                                <div className="flex gap-4 mt-6">
-                                                    <a
-                                                        href={`https://vercel.com/new/clone?repository-url=https://github.com/Sourodip-1/postpipe-connector-template&project-name=postpipe-connector&repository-name=postpipe-connector&env=POSTPIPE_CONNECTOR_ID,POSTPIPE_CONNECTOR_SECRET&envDescription=Enter_your_connector_credentials&envLink=${encodeURIComponent('https://postpipe.in/dashboard')}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="group flex items-center justify-center gap-2 bg-black border border-neutral-800 hover:border-neutral-600 rounded-md p-3 transition-all h-9 text-sm px-4"
-                                                    >
-                                                        <span className="text-neutral-300 font-medium group-hover:text-white">Vercel Deploy</span>
-                                                        <svg viewBox="0 0 76 65" fill="currentColor" className="h-3 w-3 text-neutral-300 group-hover:text-white">
-                                                            <path d="M37.5274 0L75.0548 65H0L37.5274 0Z" />
-                                                        </svg>
-                                                    </a>
-                                                    <a
-                                                        href={`https://portal.azure.com/#create/Microsoft.Template/uri/${encodeURIComponent('https://raw.githubusercontent.com/Sourodip-1/postpipe-connector-template/main/azuredeploy.json')}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="group flex items-center justify-center gap-2 bg-black border border-neutral-800 hover:border-blue-900/50 rounded-md p-3 transition-all h-9 text-sm px-4"
-                                                    >
-                                                        <span className="text-neutral-300 font-medium group-hover:text-blue-400">Azure Deploy</span>
-                                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="h-4 w-4">
-                                                            <path d="M11.64 3.93h.03l7.98 16.5h-3.41l-1.57-3.43H6.05l5.59-13.07ZM9.3 14h5.66l-2.82-6.17L9.3 14Zm-4.95 6.43h-2.9L8.4.5h3.69l-7.74 19.86Z" fill="#0078D4" />
-                                                        </svg>
-                                                    </a>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Step 2: Deploy to Platform */}
-                                    <div className="relative z-10 flex gap-6 mb-12">
-                                        <div className="flex-shrink-0 w-12 h-12 md:w-16 md:h-16 rounded-full bg-background border flex items-center justify-center font-mono font-bold text-lg md:text-xl shadow-sm">
-                                            2
-                                        </div>
-                                        <div className="flex-1 pt-2">
-                                            <h3 className="text-xl font-semibold mb-2">Deploy to Your Cloud</h3>
-                                            <p className="text-muted-foreground mb-4">
-                                                Deploy the generated connector to Vercel, Azure, or AWS.
-                                                Once deployed, you will receive a public URL.
-                                            </p>
-
-                                            <div className="bg-muted/50 rounded-none border p-3">
-                                                <div className="text-xs text-muted-foreground uppercase font-semibold mb-2 tracking-wider">Output URL</div>
-                                                <Input
-                                                    placeholder="https://postpipe-connector-yourname.vercel.app"
-                                                    className="font-mono text-sm bg-background border-none shadow-none rounded-none px-3 py-2 h-auto focus-visible:ring-0 placeholder:text-muted-foreground/70"
-                                                    value={inputUrl}
-                                                    onChange={(e) => setInputUrl(e.target.value)}
-                                                />
-                                            </div>
-                                            <Button
-                                                variant="outline"
-                                                className="w-full mt-4 gap-2 text-muted-foreground group"
-                                                onClick={handleRegister}
-                                                disabled={isRegistering || !inputUrl || !!connectorData}
-                                            >
-                                                {isRegistering ? (
-                                                    <>Registering <Loader2 className="h-4 w-4 animate-spin" /></>
-                                                ) : connectorData ? (
-                                                    <>Registered <Check className="h-4 w-4" /></>
-                                                ) : (
-                                                    <>Next <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" /></>
-                                                )}
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-
-                            {/* Step 3: Get Connector Credentials - Always Visible (conditionally styled if registered?) */}
-                            {/* If registered, we might want to hide the number '3' or change it to a generic icon, but sticking to structure for now unless requested. */}
-                            <div className="relative z-10 flex gap-6">
-                                <div className="flex-shrink-0 w-12 h-12 md:w-16 md:h-16 rounded-full bg-background border flex items-center justify-center font-mono font-bold text-lg md:text-xl shadow-sm">
-                                    {isFullyRegistered ? <Check className="h-6 w-6 text-primary" /> : "3"}
-                                </div>
-                                <div className="flex-1 pt-2">
-                                    <h3 className="text-xl font-semibold mb-2">Get Connector Credentials</h3>
-
-                                    {!connectorData ? (
-                                        <>
-                                            <p className="text-muted-foreground mb-4">
-                                                Enter your deployment URL above and click Next to generate your credentials.
-                                            </p>
-                                            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 flex items-start gap-3 mb-4">
-                                                <ShieldCheck className="h-5 w-5 text-amber-500 mt-0.5" />
-                                                <div className="text-sm text-amber-500/90">
-                                                    <strong>Security Note:</strong> No database credentials are shared. PostPipe only needs the URL to communicate.
-                                                </div>
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-500">
-                                            <p className="text-muted-foreground">
-                                                Use these credentials to configure your connector.
-                                            </p>
-
-                                            {/* Connector ID */}
-                                            <div className="space-y-1.5">
-                                                <div className="text-xs font-medium text-muted-foreground">Connector ID</div>
-                                                <div className="flex items-center gap-2">
-                                                    <code className="relative rounded bg-muted px-[0.5rem] py-[0.35rem] font-mono text-sm font-semibold flex-1 border">
-                                                        {connectorData.id}
-                                                    </code>
-                                                    <Button variant="outline" size="icon" onClick={() => copyToClipboard(connectorData.id, "Connector ID")}>
-                                                        <Copy className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            </div>
-
-                                            {/* Connector Secret */}
-                                            <div className="space-y-1.5">
-                                                <div className="text-xs font-medium text-muted-foreground">Connector Secret</div>
-                                                <div className="flex items-center gap-2">
-                                                    <div className="relative flex-1 group">
-                                                        <code className={cn("rounded bg-muted px-[0.5rem] py-[0.35rem] font-mono text-sm font-semibold block w-full truncate border", !showSecret && "blur-sm select-none")}>
-                                                            {showSecret ? connectorData.secret : "sk_live_•••••••••••••••••••••"}
-                                                        </code>
-                                                        {!showSecret && (
-                                                            <div className="absolute inset-0 flex items-center justify-center bg-transparent group-hover:bg-muted/10 transition cursor-pointer" onClick={() => setShowSecret(true)}>
-                                                                <span className="sr-only">Show</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <Button variant="ghost" size="icon" onClick={() => setShowSecret(!showSecret)}>
-                                                        {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                                    </Button>
-                                                    <Button variant="outline" size="icon" onClick={() => copyToClipboard(connectorData.secret, "Secret Key")} disabled={!showSecret}>
-                                                        <Copy className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            </div>
-
-                                            <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 flex items-center gap-3 mt-4">
-                                                <Check className="h-4 w-4 text-green-600" />
-                                                <div className="text-sm text-green-600 font-medium">
-                                                    Connector Registered Successfully!
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
+                    {/* Step 2: Deploy */}
+                    <div className={cn("space-y-6 transition-opacity duration-300", step !== 2 && "opacity-50 pointer-events-none hidden")}>
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold">2</div>
+                            <h3 className="text-xl font-semibold">Deploy to Cloud</h3>
                         </div>
 
-                        <Separator className="my-12" />
-
-                        {/* SECTION 3: Continue to Dashboard */}
-                        <div className="text-center space-y-6 bg-card border rounded-xl p-8 shadow-sm">
-                            <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-2">
-                                <Server className="h-6 w-6 text-primary" />
-                            </div>
-                            <div>
-                                <h3 className="text-2xl font-bold mb-2">Ready to Create Forms?</h3>
-                                <p className="text-muted-foreground max-w-lg mx-auto">
-                                    Once you have your connector URL, proceed to the dashboard to generate your Connector ID & Secret.
+                        <div className="pl-14 space-y-6">
+                            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
+                                <h4 className="font-semibold text-amber-600 mb-2 flex items-center gap-2">
+                                    <ShieldCheck className="h-4 w-4" /> Important: Copy These First
+                                </h4>
+                                <p className="text-sm text-amber-600/90 mb-4">
+                                    You will need to paste these into Vercel/Azure during deployment.
                                 </p>
+
+                                {connectorData && (
+                                    <div className="space-y-3 bg-background/50 p-3 rounded border">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-mono text-muted-foreground">POSTPIPE_CONNECTOR_ID</span>
+                                            <div className="flex items-center gap-2">
+                                                <code className="text-xs font-mono bg-muted px-2 py-1 rounded">{connectorData.id}</code>
+                                                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => copyToClipboard(connectorData.id, "ID")}><Copy className="h-3 w-3" /></Button>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-mono text-muted-foreground">POSTPIPE_CONNECTOR_SECRET</span>
+                                            <div className="flex items-center gap-2">
+                                                <code className="text-xs font-mono bg-muted px-2 py-1 rounded">
+                                                    {showSecret ? connectorData.secret : "••••••••••••••••"}
+                                                </code>
+                                                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setShowSecret(!showSecret)}>
+                                                    {showSecret ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                                                </Button>
+                                                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => copyToClipboard(connectorData.secret, "Secret")}><Copy className="h-3 w-3" /></Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
-                            <RainbowButton
-                                className="w-auto px-10 gap-2 text-base h-12 mt-6"
-                                onClick={() => setShowCreateForm(true)}
-                            >
-                                Create Forms <ArrowRight className="h-4 w-4" />
-                            </RainbowButton>
+                            <div className="space-y-2">
+                                <p className="text-sm font-medium">Click below to deploy (keep this tab open!)</p>
+                                <div className="flex gap-4">
+                                    <a
+                                        href={`https://vercel.com/new/clone?repository-url=https://github.com/Sourodip-1/postpipe-connector-template&project-name=postpipe-connector&repository-name=postpipe-connector&env=POSTPIPE_CONNECTOR_ID,POSTPIPE_CONNECTOR_SECRET,MONGODB_URI&envDescription=Paste_Credentials_From_PostPipe&envLink=${encodeURIComponent('https://postpipe.in/dashboard')}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex-1 flex items-center justify-center gap-2 bg-black text-white hover:bg-neutral-800 rounded-md p-3 transition-colors text-sm font-medium"
+                                    >
+                                        <svg viewBox="0 0 76 65" fill="currentColor" className="h-4 w-4"><path d="M37.5274 0L75.0548 65H0L37.5274 0Z" /></svg>
+                                        Deploy to Vercel
+                                    </a>
+                                </div>
+                            </div>
+
+                            <Button variant="outline" className="w-full" onClick={() => setStep(3)}>
+                                I have deployed it <ArrowRight className="ml-2 h-4 w-4" />
+                            </Button>
                         </div>
-
                     </div>
-                )}
 
-                {showCreateForm && (
-                    <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <NewFormClient onBack={() => setShowCreateForm(false)} />
+                    {/* Step 3: Connect */}
+                    <div className={cn("space-y-4 transition-opacity duration-300", step !== 3 && "opacity-50 pointer-events-none hidden")}>
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold">3</div>
+                            <h3 className="text-xl font-semibold">Final Connection</h3>
+                        </div>
+                        <p className="text-muted-foreground pl-14">
+                            Paste the URL provided by Vercel (e.g. https://postpipe-connector.vercel.app).
+                        </p>
+                        <div className="pl-14 space-y-4">
+                            <Input
+                                placeholder="https://..."
+                                value={deploymentUrl}
+                                onChange={e => setDeploymentUrl(e.target.value)}
+                            />
+                            <div className="flex gap-2">
+                                <Button variant="outline" onClick={() => setStep(2)}>Back</Button>
+                                <Button onClick={handleConnect} disabled={isLoading} className="flex-1">
+                                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Connect Instance"}
+                                </Button>
+                            </div>
+                        </div>
                     </div>
-                )}
+
+                    {/* Completion State */}
+                    {isDashboardReady && (
+                        <div className="text-center space-y-6 pt-4 animate-in fade-in zoom-in">
+                            <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Check className="h-8 w-8" />
+                            </div>
+                            <h3 className="text-2xl font-bold">You're All Set!</h3>
+                            <p className="text-muted-foreground">
+                                Your private connector is now active and ready to handle submissions.
+                            </p>
+                            <div className="flex flex-col gap-3 pt-4">
+                                <RainbowButton onClick={() => setShowCreateForm(true)}>
+                                    Create Your First Form
+                                </RainbowButton>
+                                <Button variant="ghost" onClick={() => {
+                                    if (user?.email) {
+                                        localStorage.removeItem(`pp_setup_step_${user.email}`); // Reset
+                                        setIsDashboardReady(false);
+                                        setStep(1);
+                                        setConnectorData(null);
+                                    }
+                                }}>
+                                    Setup Another Connector
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
+                </div>
             </div>
         </div>
     );

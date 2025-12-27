@@ -72,15 +72,15 @@ async function getDB() {
 
 // --- Connectors ---
 // --- Connectors ---
-export async function registerConnector(url: string, name: string = 'My Connector', userId?: string): Promise<Connector> {
+export async function registerConnector(url: string | null, name: string = 'My Connector', userId?: string): Promise<Connector> {
   const db = await getDB();
 
   if (!userId) {
     throw new Error("UserId is required to register a connector");
   }
 
-  // Clean URL
-  let cleanUrl = url.replace(/\/$/, "");
+  // Clean URL if provided, otherwise PENDING
+  let cleanUrl = url ? url.replace(/\/$/, "") : "PENDING";
 
   // Check if user already has this connector
   const existingDoc = await db.collection<UserConnectorsDocument>('user_connectors').findOne({
@@ -108,6 +108,26 @@ export async function registerConnector(url: string, name: string = 'My Connecto
   );
 
   return newConnector;
+}
+
+export async function updateConnectorUrl(id: string, url: string, userId: string): Promise<void> {
+  const db = await getDB();
+  const cleanUrl = url.replace(/\/$/, "");
+
+  // Verify ownership
+  const doc = await db.collection<UserConnectorsDocument>('user_connectors').findOne({
+      userId,
+      "connectors.id": id
+  });
+
+  if (!doc) {
+      throw new Error("Connector not found or unauthorized");
+  }
+
+  await db.collection<UserConnectorsDocument>('user_connectors').updateOne(
+      { userId, "connectors.id": id },
+      { $set: { "connectors.$.url": cleanUrl } }
+  );
 }
 
 export async function getConnector(id: string): Promise<Connector | undefined> {

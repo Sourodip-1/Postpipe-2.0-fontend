@@ -1,15 +1,11 @@
 'use server';
 
-import { registerConnector } from '../../lib/server-db';
+import { registerConnector, updateConnectorUrl } from '../../lib/server-db';
 import { getSession } from '../../lib/auth/actions';
 
 export async function registerConnectorAction(formData: FormData) {
-  const url = formData.get('url') as string;
+  const url = formData.get('url') as string; // Optional now
   const name = formData.get('name') as string;
-
-  if (!url) {
-    return { error: 'URL is required' };
-  }
 
   try {
     const session = await getSession();
@@ -17,7 +13,7 @@ export async function registerConnectorAction(formData: FormData) {
       return { error: 'Unauthorized' };
     }
 
-    const connector = await registerConnector(url, name, session.userId);
+    const connector = await registerConnector(url || null, name, session.userId);
     return {
       success: true,
       connectorId: connector.id,
@@ -25,5 +21,23 @@ export async function registerConnectorAction(formData: FormData) {
     };
   } catch (e) {
     return { error: 'Failed to register connector' };
+  }
+}
+
+export async function finalizeConnectorAction(id: string, url: string) {
+  if (!id || !url) {
+      return { error: 'Connector ID and URL are required' };
+  }
+
+  try {
+      const session = await getSession();
+      if (!session || !session.userId) {
+          return { error: 'Unauthorized' };
+      }
+
+      await updateConnectorUrl(id, url, session.userId);
+      return { success: true };
+  } catch (e) {
+      return { error: 'Failed to verify connector' };
   }
 }
