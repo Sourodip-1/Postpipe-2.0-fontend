@@ -138,14 +138,16 @@ export default function OverviewClient({ forms, connectors, systems = [] }: Over
                         </Link>
                     </Button>
 
-                    <Button variant="outline" className="h-auto flex-col items-start gap-2 p-4" onClick={copyCliCommand}>
-                        <div className="rounded-full bg-zinc-500/10 p-2 text-zinc-500">
-                            <Terminal className="h-5 w-5" />
-                        </div>
-                        <div className="text-left">
-                            <div className="font-semibold">Copy CLI Command</div>
-                            <div className="text-xs text-muted-foreground">Start from your terminal</div>
-                        </div>
+                    <Button asChild variant="outline" className="h-auto flex-col items-start gap-2 p-4">
+                        <Link href="/docs">
+                            <div className="rounded-full bg-zinc-500/10 p-2 text-zinc-500">
+                                <Terminal className="h-5 w-5" />
+                            </div>
+                            <div className="text-left">
+                                <div className="font-semibold">Copy CLI Command</div>
+                                <div className="text-xs text-muted-foreground">Start from your terminal</div>
+                            </div>
+                        </Link>
                     </Button>
                 </div>
             </div>
