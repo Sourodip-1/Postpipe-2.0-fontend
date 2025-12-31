@@ -4,7 +4,6 @@ import Link from "next/link";
 import {
     Card,
     CardContent,
-    CardDescription,
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
@@ -14,13 +13,19 @@ import {
     FileText,
     Key,
     Activity,
-    Plus,
     Terminal,
     Zap
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { Form, Connector } from "@/lib/server-db";
 
-export default function OverviewClient() {
+interface OverviewClientProps {
+    forms: any[]; // Using any to match serialized data from action, ideally should match Form with extra fields
+    connectors: any[];
+    systems: any[];
+}
+
+export default function OverviewClient({ forms, connectors, systems = [] }: OverviewClientProps) {
     const copyCliCommand = () => {
         navigator.clipboard.writeText("npx create-postpipe-app@latest");
         toast({
@@ -28,6 +33,9 @@ export default function OverviewClient() {
             description: "CLI command copied to clipboard",
         });
     };
+
+    // Sort forms by creation date (newest first)
+    const recentForms = [...forms].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5);
 
     return (
         <div className="flex flex-col gap-8">
@@ -46,9 +54,9 @@ export default function OverviewClient() {
                         <Server className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">3</div>
+                        <div className="text-2xl font-bold">{systems.length}</div>
                         <p className="text-xs text-muted-foreground">
-                            2 Active, 1 Paused
+                            Total active systems
                         </p>
                     </CardContent>
                 </Card>
@@ -58,9 +66,9 @@ export default function OverviewClient() {
                         <FileText className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">12</div>
+                        <div className="text-2xl font-bold">{forms.length}</div>
                         <p className="text-xs text-muted-foreground">
-                            +28% from last month
+                            Total active forms
                         </p>
                     </CardContent>
                 </Card>
@@ -70,9 +78,9 @@ export default function OverviewClient() {
                         <Key className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">2</div>
+                        <div className="text-2xl font-bold">{connectors.length}</div>
                         <p className="text-xs text-muted-foreground">
-                            Prod & Dev environments
+                            Connected apps
                         </p>
                     </CardContent>
                 </Card>
@@ -82,9 +90,9 @@ export default function OverviewClient() {
                         <Activity className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">1,240</div>
+                        <div className="text-2xl font-bold">0</div>
                         <p className="text-xs text-muted-foreground">
-                            +201 since last hour
+                            Analytics coming soon
                         </p>
                     </CardContent>
                 </Card>
@@ -130,43 +138,44 @@ export default function OverviewClient() {
                         </Link>
                     </Button>
 
-                    <Button variant="outline" className="h-auto flex-col items-start gap-2 p-4" onClick={copyCliCommand}>
-                        <div className="rounded-full bg-zinc-500/10 p-2 text-zinc-500">
-                            <Terminal className="h-5 w-5" />
-                        </div>
-                        <div className="text-left">
-                            <div className="font-semibold">Copy CLI Command</div>
-                            <div className="text-xs text-muted-foreground">Start from your terminal</div>
-                        </div>
+                    <Button asChild variant="outline" className="h-auto flex-col items-start gap-2 p-4">
+                        <Link href="/docs">
+                            <div className="rounded-full bg-zinc-500/10 p-2 text-zinc-500">
+                                <Terminal className="h-5 w-5" />
+                            </div>
+                            <div className="text-left">
+                                <div className="font-semibold">Copy CLI Command</div>
+                                <div className="text-xs text-muted-foreground">Start from your terminal</div>
+                            </div>
+                        </Link>
                     </Button>
                 </div>
             </div>
 
             {/* Recent Activity Mock */}
             <div>
-                <h2 className="mb-4 text-lg font-semibold">Recent Activity</h2>
+                <h2 className="mb-4 text-lg font-semibold">Recent Forms</h2>
                 <Card>
                     <CardContent className="p-0">
                         <div className="divide-y">
-                            {[
-                                { action: "Created new auth system", time: "2 hours ago", user: "Demo User" },
-                                { action: "Form submission received", time: "5 hours ago", user: "External" },
-                                { action: "Rotated production keys", time: "1 day ago", user: "Demo User" },
-                                { action: "Deployed E-commerce backend", time: "2 days ago", user: "Demo User" },
-                            ].map((item, i) => (
+                            {recentForms.length > 0 ? recentForms.map((form, i) => (
                                 <div key={i} className="flex items-center justify-between p-4">
                                     <div className="flex items-center gap-4">
-                                        <div className="rounded-full bg-muted p-2">
-                                            <Activity className="h-4 w-4 text-muted-foreground" />
+                                        <div className="rounded-full bg-blue-500/10 p-2">
+                                            <FileText className="h-4 w-4 text-blue-500" />
                                         </div>
                                         <div>
-                                            <p className="text-sm font-medium">{item.action}</p>
-                                            <p className="text-xs text-muted-foreground">{item.user}</p>
+                                            <p className="text-sm font-medium">{form.name}</p>
+                                            <p className="text-xs text-muted-foreground">ID: {form.id}</p>
                                         </div>
                                     </div>
-                                    <div className="text-xs text-muted-foreground">{item.time}</div>
+                                    <div className="text-xs text-muted-foreground">{new Date(form.createdAt).toLocaleDateString()}</div>
                                 </div>
-                            ))}
+                            )) : (
+                                <div className="p-4 text-center text-sm text-muted-foreground">
+                                    No forms created yet.
+                                </div>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
@@ -175,3 +184,4 @@ export default function OverviewClient() {
         </div>
     );
 }
+

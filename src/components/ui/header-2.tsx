@@ -20,7 +20,7 @@ export function Header2() {
 		{ href: "/explore", label: "Dynamic" },
 		{ href: "/static", label: "Static" },
 		{ href: "/dashboard/workflows", label: "Workflows" },
-		{ href: "#docs", label: "Docs" },
+		{ href: "/docs", label: "Docs" },
 	];
 
 	return (

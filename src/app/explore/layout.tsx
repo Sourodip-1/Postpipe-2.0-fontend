@@ -1,5 +1,4 @@
 "use client";
-import { SidebarProvider } from "@/components/ui/sidebar"
 import { ExploreLayoutWrapper } from "@/components/explore/ExploreLayoutWrapper"
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
@@ -22,10 +21,8 @@ export default function ExploreLayout({
     if (loading) return null;
 
     return (
-        <SidebarProvider defaultOpen={true}>
-            <ExploreLayoutWrapper>
-                {children}
-            </ExploreLayoutWrapper>
-        </SidebarProvider>
+        <ExploreLayoutWrapper>
+            {children}
+        </ExploreLayoutWrapper>
     )
 }

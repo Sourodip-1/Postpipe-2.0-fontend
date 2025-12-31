@@ -6,6 +6,12 @@ export interface ITemplateAuthor {
   profileUrl?: string;
 }
 
+export interface IDatabaseConfig {
+  databaseName: string;
+  logo: string;
+  prompt: string;
+}
+
 export interface ITemplate extends Document {
   name: string;
   slug: string;
@@ -16,6 +22,7 @@ export interface ITemplate extends Document {
   demoGifUrl: string;
   cli: string;
   aiPrompt: string;
+  databaseConfigurations?: IDatabaseConfig[];
   npmPackageUrl: string;
   version: string;
   isPublished: boolean;
@@ -37,6 +44,13 @@ const TemplateSchema: Schema<ITemplate> = new Schema(
     demoGifUrl: { type: String, default: '' },
     cli: { type: String, default: '' },
     aiPrompt: { type: String, default: '' },
+    databaseConfigurations: [
+      {
+        databaseName: { type: String },
+        logo: { type: String },
+        prompt: { type: String },
+      }
+    ],
     npmPackageUrl: { type: String, default: '' },
     version: { type: String, default: '1.0.0' },
     isPublished: { type: Boolean, default: true },

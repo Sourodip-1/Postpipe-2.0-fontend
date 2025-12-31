@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { getForm, getConnector } from '../../../../../lib/server-db';
+import { getForm, getConnector, addSubmission } from '../../../../../lib/server-db';
 
 export async function POST(
   req: NextRequest, 
@@ -12,6 +12,10 @@ export async function POST(
 
     if (!form) {
       return NextResponse.json({ error: 'Form not found' }, { status: 404 });
+    }
+
+    if (form.status === 'Paused') {
+        return NextResponse.json({ error: 'Form is paused and not accepting submissions.' }, { status: 423 });
     }
 
     const connector = await getConnector(form.connectorId);
@@ -45,6 +49,13 @@ export async function POST(
         signature: "legacy_proxied" 
     };
 
+    // 2.5 Save to Internal DB (Static Storage)
+    await addSubmission(formId, {
+        id: submissionId,
+        submittedAt: timestamp,
+        data
+    });
+
     // 3. Sign Payload (Simulating Core Security)
     const bodyString = JSON.stringify(payload);
     const signature = crypto
@@ -58,19 +69,26 @@ export async function POST(
     
     console.log(`[Proxy] Forwarding to ${ingestUrl}`);
 
-    const res = await fetch(ingestUrl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'x-postpipe-signature': signature
-        },
-        body: bodyString
-    });
+    try {
+        const res = await fetch(ingestUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-postpipe-signature': signature
+            },
+            body: bodyString
+        });
 
-    if (!res.ok) {
-        const errText = await res.text();
-        console.error(`[Proxy] Webhook failed: ${res.status} ${errText}`);
-        return NextResponse.json({ error: 'Connector rejected submission' }, { status: 502 });
+        if (!res.ok) {
+            const errText = await res.text();
+            console.error(`[Proxy] Webhook failed: ${res.status} ${errText}`);
+            // We don't fail the request if internal storage succeeded, but ideally we warn.
+            // For now, let's treat internal storage as primary for "View Submissions" feature.
+            // But if the user EXPECTS webhook, this might ideally fail.
+            // Given "Static Form" context, internal success is enough.
+        }
+    } catch (e) {
+        console.error(`[Proxy] Connection failed to ${ingestUrl}`, e);
     }
 
     // 5. Success

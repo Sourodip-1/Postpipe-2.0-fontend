@@ -1,7 +1,8 @@
 "use client";
 
+import React, { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Database, Download, RefreshCw } from "lucide-react";
+import { ArrowLeft, Database, RefreshCw, Key, Link as LinkIcon, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
     Table,
@@ -13,40 +14,86 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { toast } from "@/hooks/use-toast";
 
-// Mock Data
-const SUBMISSIONS = [
-    { id: "sub_1", submittedAt: "Oct 24, 2024, 10:23 AM", data: { email: "alice@example.com", message: "Interested in the enterprise plan." } },
-    { id: "sub_2", submittedAt: "Oct 24, 2024, 09:15 AM", data: { email: "bob@test.com", message: "Help with integration." } },
-    { id: "sub_3", submittedAt: "Oct 23, 2024, 4:45 PM", data: { email: "charlie@domain.org", message: "Reporting a bug." } },
-];
+interface SubmissionsClientProps {
+    id: string;
+    formName: string;
+    initialSubmissions: any[];
+    endpoint: string;
+    token: string;
+}
 
-export default function SubmissionsClient({ id }: { id: string }) {
+export default function SubmissionsClient({ id, formName, initialSubmissions, endpoint, token }: SubmissionsClientProps) {
+    const [submissions, setSubmissions] = useState(initialSubmissions);
+
+    const copyToClipboard = (text: string, label: string) => {
+        navigator.clipboard.writeText(text);
+        toast({ title: "Copied", description: `${label} copied to clipboard.` });
+    };
+
     return (
-        <div className="flex flex-col gap-8 max-w-6xl mx-auto">
+        <div className="flex flex-col gap-8 max-w-6xl mx-auto p-4 sm:p-6 lg:p-8">
             <div className="flex items-center gap-4">
                 <Link href="/dashboard/forms">
                     <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
                 </Link>
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight">Form Submissions</h1>
-                    <p className="text-muted-foreground text-sm">Viewing recent activity for Form ID: <span className="font-mono">{id}</span></p>
+                    <p className="text-muted-foreground text-sm">Viewing data for <span className="font-semibold">{formName}</span> ({id})</p>
                 </div>
                 <div className="ml-auto flex gap-2">
-                    <Button variant="outline">
+                    <Button variant="outline" onClick={() => window.location.reload()}>
                         <RefreshCw className="mr-2 h-4 w-4" /> Refresh
                     </Button>
-                    <Button variant="outline">
-                        <Download className="mr-2 h-4 w-4" /> Export CSV
-                    </Button>
                 </div>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2">
+                <Card>
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+                            <LinkIcon className="h-4 w-4 text-muted-foreground" />
+                            GET Endpoint
+                        </CardTitle>
+                        <CardDescription>Retrieve submissions via API</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex items-center gap-2">
+                            <Input value={endpoint} readOnly className="font-mono text-xs" />
+                            <Button variant="ghost" size="icon" onClick={() => copyToClipboard(endpoint, "Endpoint")}>
+                                <Copy className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+                            <Key className="h-4 w-4 text-muted-foreground" />
+                            Read Token
+                        </CardTitle>
+                        <CardDescription>Bearer token for authentication</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex items-center gap-2">
+                            <Input value={token} readOnly className="font-mono text-xs" type="password" />
+                            <Button variant="ghost" size="icon" onClick={() => copyToClipboard(token, "Token")}>
+                                <Copy className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
 
             <Alert variant="default" className="bg-blue-500/10 text-blue-600 border-blue-500/20">
                 <Database className="h-4 w-4" />
                 <AlertTitle>Data Source Info</AlertTitle>
                 <AlertDescription>
-                    This is a convenience view cache. Your connected database is the single source of truth for all data.
+                    Data is fetched directly from your active connector.
                 </AlertDescription>
             </Alert>
 
@@ -60,26 +107,26 @@ export default function SubmissionsClient({ id }: { id: string }) {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {SUBMISSIONS.map((sub) => (
-                            <TableRow key={sub.id}>
+                        {submissions.map((sub: any) => (
+                            <TableRow key={sub.submissionId || sub.id}>
                                 <TableCell className="font-mono text-xs text-muted-foreground">
-                                    {sub.id}
+                                    {sub.submissionId || sub.id}
                                 </TableCell>
                                 <TableCell className="text-sm">
-                                    {sub.submittedAt}
+                                    {sub.timestamp || sub.submittedAt}
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex flex-wrap gap-2">
-                                        {Object.entries(sub.data).map(([key, value]) => (
+                                        {Object.entries(sub.data || {}).map(([key, value]) => (
                                             <Badge key={key} variant="secondary" className="font-normal">
-                                                <span className="font-semibold mr-1 opacity-70">{key}:</span> {value}
+                                                <span className="font-semibold mr-1 opacity-70">{key}:</span> {String(value)}
                                             </Badge>
                                         ))}
                                     </div>
                                 </TableCell>
                             </TableRow>
                         ))}
-                        {SUBMISSIONS.length === 0 && (
+                        {submissions.length === 0 && (
                             <TableRow>
                                 <TableCell colSpan={3} className="h-24 text-center">
                                     No submissions found.

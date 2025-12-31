@@ -67,7 +67,8 @@ export function ExploreModal({ open, onOpenChange, item }: ExploreModalProps) {
                 description: `${type} copied to clipboard.`,
             });
             if (item.id) {
-                await createSystem(item.id);
+                // Track usage
+                await createSystem(item.title, item.tags?.[0] || 'Application', item.id);
             }
         } catch (err) {
             console.error('Failed to copy', err);
@@ -77,7 +78,7 @@ export function ExploreModal({ open, onOpenChange, item }: ExploreModalProps) {
     const handleOpenPackage = async () => {
         if (item.npmPackageUrl) {
             if (item.id) {
-                await createSystem(item.id);
+                await createSystem(item.title, item.tags?.[0] || 'Application', item.id);
             }
             window.open(item.npmPackageUrl, '_blank');
         }

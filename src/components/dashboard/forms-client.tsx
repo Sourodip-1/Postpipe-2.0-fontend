@@ -35,7 +35,8 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { deleteFormAction } from "@/app/actions/dashboard";
+import { useRouter } from "next/navigation";
+import { deleteFormAction, duplicateFormAction, toggleFormStatusAction } from "@/app/actions/dashboard";
 
 type Form = {
     id: string;
@@ -55,29 +56,83 @@ interface FormsClientProps {
 
 
 export default function FormsClient({ initialForms = [] }: FormsClientProps) {
-    const [forms, setForms] = React.useState<Form[]>(initialForms.map((f: any) => ({
-        id: f.id,
-        name: f.name,
-        connectorName: "Active Connector", // We might want to fetch connector name if possible, or just generic
-        submissions: 0, // Assuming 0 for now as we don't have submission count in DB yet
-        lastSubmission: "Never",
-        status: "Live",
-        fields: f.fields || []
-    })));
+    const router = useRouter();
 
-    const toggleStatus = (id: string) => {
+    // Helper to map DB form to UI form
+    // Helper to map DB form to UI form
+    const mapForms = (data: any[]) => data.map((f: any) => {
+        const subCount = f.submissions?.length || 0;
+        let lastSub = "Never";
+
+        if (subCount > 0 && f.submissions) {
+            // Sort by date descending
+            const sorted = [...f.submissions].sort((a: any, b: any) =>
+                new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+            );
+            if (sorted[0]) {
+                lastSub = new Date(sorted[0].submittedAt).toLocaleDateString(undefined, {
+                    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                });
+            }
+        }
+
+        return {
+            id: f.id,
+            name: f.name,
+            connectorName: f.connectorName || "Standard Connector",
+            submissions: subCount,
+            lastSubmission: lastSub,
+            status: f.status || "Live",
+            fields: f.fields || []
+        };
+    });
+
+    const [forms, setForms] = React.useState<Form[]>(mapForms(initialForms));
+
+    // Sync with server data when it changes (e.g. after duplication)
+    React.useEffect(() => {
+        setForms(mapForms(initialForms));
+    }, [initialForms]);
+
+    const toggleStatus = async (id: string) => {
         const form = forms.find(f => f.id === id);
         if (!form) return;
 
+        // Optimistic update
         const newStatus = form.status === 'Live' ? 'Paused' : 'Live';
-        toast({ description: `Form ${newStatus === 'Live' ? 'resumed' : 'paused'}` });
-
         setForms(prev => prev.map(f => {
             if (f.id === id) {
                 return { ...f, status: newStatus };
             }
             return f;
         }));
+
+        toast({ description: `Form ${newStatus === 'Live' ? 'resumed' : 'paused'}` });
+
+        try {
+            await toggleFormStatusAction(id);
+            router.refresh();
+        } catch (e) {
+            // Revert on failure
+            setForms(prev => prev.map(f => {
+                if (f.id === id) {
+                    return { ...f, status: form.status };
+                }
+                return f;
+            }));
+            toast({ title: "Error", description: "Failed to update status", variant: "destructive" });
+        }
+    };
+
+    const handleDuplicate = async (id: string) => {
+        toast({ description: "Duplicating form..." });
+        try {
+            await duplicateFormAction(id);
+            toast({ title: "Success", description: "Form duplicated." });
+            router.refresh(); // This will trigger the prop update and useEffect
+        } catch (e) {
+            toast({ title: "Error", description: "Failed to duplicate form", variant: "destructive" });
+        }
     };
 
     const deleteForm = async (id: string) => {
@@ -89,6 +144,7 @@ export default function FormsClient({ initialForms = [] }: FormsClientProps) {
             await deleteFormAction(id);
 
             toast({ title: "Form Deleted", description: "The form has been permanently removed.", variant: "destructive" });
+            router.refresh();
         } catch (e) {
             toast({ title: "Error", description: "Failed to delete form", variant: "destructive" });
         }
@@ -198,7 +254,7 @@ ${form.fields.map((f: any) => `  <div>
                                                 <DropdownMenuItem onClick={() => copyEmbed(form.id)}>
                                                     <Code className="mr-2 h-4 w-4" /> Copy Embed HTML
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => toast({ description: "Form duplicated" })}>
+                                                <DropdownMenuItem onClick={() => handleDuplicate(form.id)}>
                                                     <CopyPlus className="mr-2 h-4 w-4" /> Duplicate Form
                                                 </DropdownMenuItem>
                                                 <DropdownMenuSeparator />
