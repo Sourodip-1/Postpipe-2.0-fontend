@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { getForm, getConnector, addSubmission } from '../../../../../lib/server-db';
+import fs from 'fs';
+import path from 'path';
+import { getForm, getConnector, incrementSubmissionCount, getUserDatabaseConfig } from '../../../../../lib/server-db';
 
 export async function POST(
-  req: NextRequest, 
+  req: NextRequest,
   { params }: { params: Promise<{ formId: string }> }
 ) {
   try {
@@ -15,7 +17,7 @@ export async function POST(
     }
 
     if (form.status === 'Paused') {
-        return NextResponse.json({ error: 'Form is paused and not accepting submissions.' }, { status: 423 });
+      return NextResponse.json({ error: 'Form is paused and not accepting submissions.' }, { status: 423 });
     }
 
     const connector = await getConnector(form.connectorId);
@@ -31,77 +33,107 @@ export async function POST(
     if (contentType.includes('application/json')) {
       data = await req.json();
     } else {
-        const formData = await req.formData();
-        formData.forEach((value, key) => {
-            // Simple handling. For multi-selects, this needs array logic.
-            data[key] = value;
-        });
+      const formData = await req.formData();
+      formData.forEach((value, key) => {
+        // Simple handling. For multi-selects, this needs array logic.
+        data[key] = value;
+      });
     }
 
     // 2. Prepare Payload
     const timestamp = new Date().toISOString();
     const submissionId = `sub_${Math.random().toString(36).substr(2, 9)}`;
+
+    let databaseConfig = null;
+    try {
+      // Resolve from MongoDB (User Database Config)
+      if (form.userId) {
+        const userConfig = await getUserDatabaseConfig(form.userId);
+        if (userConfig && userConfig.databases) {
+          const target = form.targetDatabase || userConfig.defaultTarget || "default";
+          if (userConfig.databases[target]) {
+            databaseConfig = userConfig.databases[target];
+            console.log(`[Proxy] Resolved DB Config for '${target}' via MongoDB.`);
+          } else {
+            console.warn(`[Proxy] Target '${target}' not found in user config.`);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Failed to resolve db config", e);
+    }
+
+    // Fallback? File system one is deprecated.
+    if (!databaseConfig) {
+      console.warn("[Proxy] No databaseConfig resolved. Connector might fail if running in dynamic mode.");
+    }
+
     const payload = {
-        formId,
-        submissionId,
-        timestamp,
-        data,
-        signature: "legacy_proxied" 
+      formId,
+      submissionId,
+      timestamp,
+      data,
+      targetDatabase: form.targetDatabase || "default",
+      databaseConfig,
+      signature: "legacy_proxied"
     };
 
-    // 2.5 Save to Internal DB (Static Storage)
-    await addSubmission(formId, {
-        id: submissionId,
-        submittedAt: timestamp,
-        data
-    });
+    // 2.5 Save to Internal DB (Static Storage) - DISABLED
 
     // 3. Sign Payload (Simulating Core Security)
     const bodyString = JSON.stringify(payload);
     const signature = crypto
-        .createHmac('sha256', connector.secret)
-        .update(bodyString)
-        .digest('hex');
+      .createHmac('sha256', connector.secret)
+      .update(bodyString)
+      .digest('hex');
 
     // 4. Forward to Connector Webhook
     // In real PostPipe, this happens asynchronously via a queue.
-    const ingestUrl = `${connector.url}/postpipe/ingest`; 
-    
+    const ingestUrl = `${connector.url}/postpipe/ingest`;
+
+    console.log(`[Proxy] Prepared Payload:`, JSON.stringify(payload, null, 2));
     console.log(`[Proxy] Forwarding to ${ingestUrl}`);
 
     try {
-        const res = await fetch(ingestUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-postpipe-signature': signature
-            },
-            body: bodyString
-        });
+      const res = await fetch(ingestUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-postpipe-signature': signature
+        },
+        body: bodyString
+      });
 
-        if (!res.ok) {
-            const errText = await res.text();
-            console.error(`[Proxy] Webhook failed: ${res.status} ${errText}`);
-            // We don't fail the request if internal storage succeeded, but ideally we warn.
-            // For now, let's treat internal storage as primary for "View Submissions" feature.
-            // But if the user EXPECTS webhook, this might ideally fail.
-            // Given "Static Form" context, internal success is enough.
-        }
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error(`[Proxy] Webhook failed details: Status=${res.status} Text=${errText}`);
+        // Return 502 Bad Gateway so the client knows it failed
+        return NextResponse.json({ error: `Connector failed: ${res.statusText}` }, { status: 502 });
+      } else {
+        const successText = await res.text();
+        console.log(`[Proxy] Webhook success: ${res.status} ${successText}`);
+
+        // 5. Increment Submission Count (Zero Data Retention compliant)
+        const { incrementSubmissionCount } = require('../../../../../lib/server-db');
+        // Lazy load or import to avoid circular dep if any, though import at top is fine.
+        // Let's use the import we will add at the top
+        await incrementSubmissionCount(formId);
+      }
     } catch (e) {
-        console.error(`[Proxy] Connection failed to ${ingestUrl}`, e);
+      console.error(`[Proxy] Connection failed to ${ingestUrl}`, e);
     }
 
     // 5. Success
     // If it's a browser form submit, redirect back (or to thank you page)
     // For API calls, return JSON.
     if (!contentType.includes('application/json')) {
-        // Simple redirect back to referrer or a success page
-        const referer = req.headers.get('referer');
-        if (referer) {
-             const url = new URL(referer);
-             url.searchParams.set('success', 'true');
-             return NextResponse.redirect(url);
-        }
+      // Simple redirect back to referrer or a success page
+      const referer = req.headers.get('referer');
+      if (referer) {
+        const url = new URL(referer);
+        url.searchParams.set('success', 'true');
+        return NextResponse.redirect(url);
+      }
     }
 
     return NextResponse.json({ success: true, submissionId });

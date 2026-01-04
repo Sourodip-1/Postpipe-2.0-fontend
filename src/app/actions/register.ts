@@ -26,18 +26,18 @@ export async function registerConnectorAction(formData: FormData) {
 
 export async function finalizeConnectorAction(id: string, url: string) {
   if (!id || !url) {
-      return { error: 'Connector ID and URL are required' };
+    return { error: 'Connector ID and URL are required' };
   }
 
   try {
-      const session = await getSession();
-      if (!session || !session.userId) {
-          return { error: 'Unauthorized' };
-      }
+    const session = await getSession();
+    if (!session || !session.userId) {
+      return { error: 'Unauthorized' };
+    }
 
-      await updateConnectorUrl(id, url, session.userId);
-      return { success: true };
+    await updateConnectorUrl(id, url, session.userId);
+    return { success: true };
   } catch (e) {
-      return { error: 'Failed to verify connector' };
+    return { error: 'Failed to verify connector' };
   }
 }

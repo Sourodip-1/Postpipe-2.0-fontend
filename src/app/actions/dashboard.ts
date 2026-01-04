@@ -1,12 +1,12 @@
 'use server';
 
 import crypto from 'crypto';
-import { 
-  getForms, 
-  getForm, 
-  getConnector, 
-  getConnectors, 
-  deleteForm, 
+import {
+  getForms,
+  getForm,
+  getConnector,
+  getConnectors,
+  deleteForm,
   deleteConnector,
   duplicateForm,
   updateForm,
@@ -77,7 +77,7 @@ export async function getDashboardData() {
 
   const systems = await getSystems(session.userId);
   const serializedSystems = systems.map((s: any) => ({
-      ...s,
+    ...s,
     _id: s._id?.toString(),
     id: s.id?.toString(),
   }));
@@ -86,33 +86,33 @@ export async function getDashboardData() {
 }
 
 export async function duplicateFormAction(id: string) {
-    const session = await getSession();
-    if (!session || !session.userId) throw new Error("Unauthorized");
+  const session = await getSession();
+  if (!session || !session.userId) throw new Error("Unauthorized");
 
-    await duplicateForm(id, session.userId);
-    return { success: true };
+  await duplicateForm(id, session.userId);
+  return { success: true };
 }
 
 export async function toggleFormStatusAction(id: string) {
-    const session = await getSession();
-    if (!session || !session.userId) throw new Error("Unauthorized");
+  const session = await getSession();
+  if (!session || !session.userId) throw new Error("Unauthorized");
 
-    const form = await getForm(id);
-    if (!form) return { success: false, error: "Form not found" };
-    if (form.userId !== session.userId) throw new Error("Unauthorized");
+  const form = await getForm(id);
+  if (!form) return { success: false, error: "Form not found" };
+  if (form.userId !== session.userId) throw new Error("Unauthorized");
 
-    const newStatus = form.status === 'Live' ? 'Paused' : 'Live';
-    await updateForm(id, { status: newStatus });
-    
-    return { success: true, status: newStatus };
+  const newStatus = form.status === 'Live' ? 'Paused' : 'Live';
+  await updateForm(id, { status: newStatus });
+
+  return { success: true, status: newStatus };
 }
 
 export async function createSystemAction(name: string, type: string, templateId?: string) {
-    const session = await getSession();
-    if (!session || !session.userId) throw new Error("Unauthorized");
+  const session = await getSession();
+  if (!session || !session.userId) throw new Error("Unauthorized");
 
-    const system = await createSystem(name, type, templateId, session.userId);
-    return { success: true, systemId: system.id };
+  const system = await createSystem(name, type, templateId, session.userId);
+  return { success: true, systemId: system.id };
 }
 
 export async function deleteFormAction(id: string) {
@@ -141,7 +141,23 @@ export async function deleteConnectorAction(id: string) {
   const connector = await getConnector(id);
   if (!connector) return { success: false, error: "Connector not found" };
 
+
+
   // We pass session.userId to ensure we only delete if it belongs to the user
   await deleteConnector(id, session.userId);
   return { success: true };
+}
+
+export async function getConnectorsAction() {
+  const session = await getSession();
+  if (!session || !session.userId) {
+    throw new Error("Unauthorized");
+  }
+
+  const connectors = await getConnectors(session.userId);
+  return connectors.map((c: any) => ({
+    ...c,
+    _id: c._id?.toString(),
+    id: c.id?.toString(),
+  }));
 }

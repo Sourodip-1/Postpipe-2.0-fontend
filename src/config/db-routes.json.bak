@@ -1,0 +1,18 @@
+{
+  "databases": {
+    "default": {
+      "uri": "MONGODB_URI_SECONDARY",
+      "dbName": "postpipe"
+    },
+    "backup": {
+      "uri": "MONGODB_URI_THIRD",
+      "dbName": "postpipe-2"
+    },
+    "qwerty": {
+      "uri": "MONGODB_URI_FIFTH",
+      "dbName": "final testing 2"
+    }
+  },
+  "rules": [],
+  "defaultTarget": "default"
+}
