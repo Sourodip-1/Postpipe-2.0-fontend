@@ -1,0 +1,25 @@
+src/components/dashboard/forms/form-builder.tsx(67,43): error TS2345: Argument of type 'string' is not assignable to parameter of type '"text" | "email" | "textarea" | "checkbox"'.
+src/components/theme-provider.tsx(5,41): error TS2307: Cannot find module 'next-themes/dist/types' or its corresponding type declarations.
+src/components/ui/calendar.tsx(57,9): error TS2353: Object literal may only specify known properties, and 'IconLeft' does not exist in type 'Partial<CustomComponents>'.
+src/components/ui/calendar.tsx(57,22): error TS7031: Binding element 'className' implicitly has an 'any' type.
+src/components/ui/calendar.tsx(60,23): error TS7031: Binding element 'className' implicitly has an 'any' type.
+src/components/ui/morphing-cursor.tsx(22,29): error TS2554: Expected 1 arguments, but got 0.
+static-system/postpipe-core/app/admin/[slug]/page.tsx(1,31): error TS2307: Cannot find module '@/lib/mongoose' or its corresponding type declarations.
+static-system/postpipe-core/app/admin/[slug]/page.tsx(2,22): error TS2307: Cannot find module '@/models/Template' or its corresponding type declarations.
+static-system/postpipe-core/app/admin/actions.ts(12,15): error TS2339: Property 'set' does not exist on type 'Promise<ReadonlyRequestCookies>'.
+static-system/postpipe-core/app/admin/actions.ts(24,13): error TS2339: Property 'delete' does not exist on type 'Promise<ReadonlyRequestCookies>'.
+static-system/postpipe-core/app/admin/layout.tsx(11,31): error TS2339: Property 'get' does not exist on type 'Promise<ReadonlyRequestCookies>'.
+static-system/postpipe-core/app/admin/page.tsx(1,31): error TS2307: Cannot find module '@/lib/mongoose' or its corresponding type declarations.
+static-system/postpipe-core/app/admin/page.tsx(2,22): error TS2307: Cannot find module '@/models/Template' or its corresponding type declarations.
+static-system/postpipe-core/app/api/admin/templates/[slug]/route.ts(2,31): error TS2307: Cannot find module '@/lib/mongoose' or its corresponding type declarations.
+static-system/postpipe-core/app/api/admin/templates/[slug]/route.ts(3,22): error TS2307: Cannot find module '@/models/Template' or its corresponding type declarations.
+static-system/postpipe-core/app/api/admin/templates/[slug]/route.ts(4,30): error TS2307: Cannot find module '@/lib/admin-auth' or its corresponding type declarations.
+static-system/postpipe-core/app/api/admin/templates/route.ts(2,31): error TS2307: Cannot find module '@/lib/mongoose' or its corresponding type declarations.
+static-system/postpipe-core/app/api/admin/templates/route.ts(3,22): error TS2307: Cannot find module '@/models/Template' or its corresponding type declarations.
+static-system/postpipe-core/app/api/admin/templates/route.ts(4,30): error TS2307: Cannot find module '@/lib/admin-auth' or its corresponding type declarations.
+static-system/postpipe-core/app/builder.ts(3,43): error TS2307: Cannot find module '../../lib/server-db' or its corresponding type declarations.
+static-system/postpipe-core/app/dashboard.ts(4,93): error TS2307: Cannot find module '../../lib/server-db' or its corresponding type declarations.
+static-system/postpipe-core/app/dashboard.ts(10,62): error TS7006: Parameter 'f' implicitly has an 'any' type.
+static-system/postpipe-core/app/page.tsx(3,24): error TS2307: Cannot find module '@postpipe/ui' or its corresponding type declarations.
+static-system/postpipe-core/app/register.ts(3,35): error TS2307: Cannot find module '../../lib/server-db' or its corresponding type declarations.
+static-system/postpipe-core/lib/admin-auth.ts(15,35): error TS2339: Property 'get' does not exist on type 'Promise<ReadonlyRequestCookies>'.

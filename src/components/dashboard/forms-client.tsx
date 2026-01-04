@@ -61,7 +61,8 @@ export default function FormsClient({ initialForms = [] }: FormsClientProps) {
     // Helper to map DB form to UI form
     // Helper to map DB form to UI form
     const mapForms = (data: any[]) => data.map((f: any) => {
-        const subCount = f.submissions?.length || 0;
+        // Use incremented count if available (for zero-data-retention mode), else fallback to array length
+        const subCount = f.submissionCount !== undefined ? f.submissionCount : (f.submissions?.length || 0);
         let lastSub = "Never";
 
         if (subCount > 0 && f.submissions) {

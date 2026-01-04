@@ -1,4 +1,5 @@
 "use client";
+// Force refresh
 
 import { useState } from "react";
 import {
@@ -28,6 +29,13 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import {
     Eye,
     EyeOff,
     Copy,
@@ -35,7 +43,6 @@ import {
     AlertTriangle,
     ShieldCheck,
     CheckCircle2,
-    XCircle,
     Trash2
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -44,11 +51,15 @@ import { registerConnectorAction } from "@/app/actions/register";
 import { deleteConnectorAction } from "@/app/actions/dashboard";
 
 type Connector = {
-    id: string;
+    id: string; // The UUID (conn_...)
     name: string;
-    connectorId: string;
     secret: string;
     url: string;
+    targetDatabase?: string;
+    databases?: Record<string, {
+        uri: string;
+        dbName: string;
+    }>;
     status: "Verified" | "Not Verified";
     lastUsed: string;
 };
@@ -56,26 +67,18 @@ type Connector = {
 
 interface ConnectorsClientProps {
     initialConnectors: any[];
+    databaseConfig?: any;
 }
 
-
-
-export default function ConnectorsClient({ initialConnectors = [] }: ConnectorsClientProps) {
-    const [connectors, setConnectors] = useState<Connector[]>(initialConnectors.map((c: any) => ({
-        id: c._id || c.id,
-        name: c.name,
-        connectorId: c.id, // The UUID from registerConnector
-        secret: c.secret,
-        url: c.url,
-        status: "Verified",
-        lastUsed: "Recently", // You can calculate this if createdAt exists
-    })));
+export default function ConnectorsClient({ initialConnectors, databaseConfig }: ConnectorsClientProps) {
+    const [connectors, setConnectors] = useState<Connector[]>(initialConnectors);
     const [visibleSecrets, setVisibleSecrets] = useState<Record<string, boolean>>({});
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
     // New Connector State
     const [newName, setNewName] = useState("");
     const [newUrl, setNewUrl] = useState("");
+    const [targetDatabase, setTargetDatabase] = useState("default");
     const [isRegistering, setIsRegistering] = useState(false);
 
     const toggleSecret = (id: string) => {
@@ -117,12 +120,15 @@ export default function ConnectorsClient({ initialConnectors = [] }: ConnectorsC
         if (!newName || !newUrl) return;
 
         setIsRegistering(true);
-        const formData = new FormData();
-        formData.append('name', newName);
-        formData.append('url', newUrl);
+        const FormDataObj = new FormData();
+        FormDataObj.append('name', newName);
+        FormDataObj.append('url', newUrl);
+        if (targetDatabase && targetDatabase !== "default") {
+            FormDataObj.append('targetDatabase', targetDatabase);
+        }
 
         try {
-            const res = await registerConnectorAction(formData);
+            const res = await registerConnectorAction(FormDataObj);
 
             if (res.error) {
                 toast({ title: "Registration Failed", description: res.error, variant: "destructive" });
@@ -130,9 +136,9 @@ export default function ConnectorsClient({ initialConnectors = [] }: ConnectorsC
                 const newConnector: Connector = {
                     id: res.connectorId || '',
                     name: newName,
-                    connectorId: res.connectorId || '',
                     secret: res.connectorSecret || '',
                     url: newUrl,
+                    targetDatabase: targetDatabase === "default" ? undefined : targetDatabase,
                     status: "Verified",
                     lastUsed: "Just now",
                 };
@@ -151,7 +157,7 @@ export default function ConnectorsClient({ initialConnectors = [] }: ConnectorsC
     };
 
     return (
-        <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-8" >
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Connectors & Secrets</h1>
@@ -193,6 +199,8 @@ export default function ConnectorsClient({ initialConnectors = [] }: ConnectorsC
                                     onChange={(e) => setNewUrl(e.target.value)}
                                 />
                             </div>
+
+
                         </div>
                         <DialogFooter>
                             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
@@ -202,7 +210,7 @@ export default function ConnectorsClient({ initialConnectors = [] }: ConnectorsC
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
-            </div>
+            </div >
 
             <Alert variant="default" className="bg-amber-500/10 text-amber-600 border-amber-500/20">
                 <AlertTriangle className="h-4 w-4" />
@@ -226,6 +234,12 @@ export default function ConnectorsClient({ initialConnectors = [] }: ConnectorsC
                                         {connector.status === 'Verified' ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
                                         {connector.status}
                                     </Badge>
+                                    {connector.targetDatabase && (
+                                        <Badge variant="secondary" className="gap-1 bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 border-blue-500/20">
+                                            <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                                            {connector.targetDatabase}
+                                        </Badge>
+                                    )}
                                 </div>
                                 <div className="text-sm text-muted-foreground">
                                     Last used: {connector.lastUsed}
@@ -245,9 +259,9 @@ export default function ConnectorsClient({ initialConnectors = [] }: ConnectorsC
                                     <Label>Connector ID</Label>
                                     <div className="flex items-center gap-2">
                                         <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold flex-1">
-                                            {connector.connectorId}
+                                            {connector.id}
                                         </code>
-                                        <Button variant="ghost" size="icon" onClick={() => copyToClipboard(connector.connectorId, "Connector ID")}>
+                                        <Button variant="ghost" size="icon" onClick={() => copyToClipboard(connector.id, "Connector ID")}>
                                             <Copy className="h-4 w-4" />
                                         </Button>
                                     </div>
@@ -298,7 +312,7 @@ export default function ConnectorsClient({ initialConnectors = [] }: ConnectorsC
                                     </DialogHeader>
                                     <DialogFooter>
                                         <Button variant="outline">Cancel</Button>
-                                        <Button variant="destructive" onClick={() => deleteConnector(connector.id, connector.connectorId)}>Delete Connector</Button>
+                                        <Button variant="destructive" onClick={() => deleteConnector(connector.id, connector.id)}>Delete Connector</Button>
                                     </DialogFooter>
                                 </DialogContent>
                             </Dialog>
@@ -328,6 +342,6 @@ export default function ConnectorsClient({ initialConnectors = [] }: ConnectorsC
                     </Card>
                 ))}
             </div>
-        </div>
+        </div >
     );
 }

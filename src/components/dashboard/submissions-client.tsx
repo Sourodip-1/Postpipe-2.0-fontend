@@ -18,15 +18,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 
+import { AlertTriangle, ShieldAlert } from "lucide-react";
+
 interface SubmissionsClientProps {
     id: string;
     formName: string;
     initialSubmissions: any[];
     endpoint: string;
     token: string;
+    fetchError?: string | null;
+    authError?: boolean;
 }
 
-export default function SubmissionsClient({ id, formName, initialSubmissions, endpoint, token }: SubmissionsClientProps) {
+export default function SubmissionsClient({ id, formName, initialSubmissions, endpoint, token, fetchError, authError }: SubmissionsClientProps) {
     const [submissions, setSubmissions] = useState(initialSubmissions);
 
     const copyToClipboard = (text: string, label: string) => {
@@ -51,6 +55,29 @@ export default function SubmissionsClient({ id, formName, initialSubmissions, en
                 </div>
             </div>
 
+            {fetchError && (
+                <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Connection Error</AlertTitle>
+                    <AlertDescription className="flex flex-col gap-2">
+                        <span>{fetchError}</span>
+                        {authError && (
+                            <div className="mt-2">
+                                <Link href="/dashboard/connectors">
+                                    <Button variant="secondary" size="sm">
+                                        <ShieldAlert className="mr-2 h-3 w-3" />
+                                        Manage Connector Secrets
+                                    </Button>
+                                </Link>
+                            </div>
+                        )}
+                        {!authError && (
+                            <p className="text-xs opacity-80 mt-1">Please ensure your Connector is deployed and running.</p>
+                        )}
+                    </AlertDescription>
+                </Alert>
+            )}
+
             <div className="grid gap-6 md:grid-cols-2">
                 <Card>
                     <CardHeader className="pb-3">
@@ -74,7 +101,7 @@ export default function SubmissionsClient({ id, formName, initialSubmissions, en
                     <CardHeader className="pb-3">
                         <CardTitle className="text-sm font-medium flex items-center gap-2">
                             <Key className="h-4 w-4 text-muted-foreground" />
-                            Read Token
+                            API Token
                         </CardTitle>
                         <CardDescription>Bearer token for authentication</CardDescription>
                     </CardHeader>
@@ -89,13 +116,15 @@ export default function SubmissionsClient({ id, formName, initialSubmissions, en
                 </Card>
             </div>
 
-            <Alert variant="default" className="bg-blue-500/10 text-blue-600 border-blue-500/20">
-                <Database className="h-4 w-4" />
-                <AlertTitle>Data Source Info</AlertTitle>
-                <AlertDescription>
-                    Data is fetched directly from your active connector.
-                </AlertDescription>
-            </Alert>
+            {!fetchError && (
+                <Alert variant="default" className="bg-blue-500/10 text-blue-600 border-blue-500/20">
+                    <Database className="h-4 w-4" />
+                    <AlertTitle>Data Source Info</AlertTitle>
+                    <AlertDescription>
+                        Data is fetched directly from your active connector.
+                    </AlertDescription>
+                </Alert>
+            )}
 
             <div className="rounded-md border">
                 <Table>
@@ -129,7 +158,11 @@ export default function SubmissionsClient({ id, formName, initialSubmissions, en
                         {submissions.length === 0 && (
                             <TableRow>
                                 <TableCell colSpan={3} className="h-24 text-center">
-                                    No submissions found.
+                                    {fetchError ? (
+                                        <span className="text-destructive">Unable to load submissions.</span>
+                                    ) : (
+                                        "No submissions found."
+                                    )}
                                 </TableCell>
                             </TableRow>
                         )}

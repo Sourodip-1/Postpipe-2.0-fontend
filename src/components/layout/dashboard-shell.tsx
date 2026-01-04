@@ -16,6 +16,7 @@ import {
     Terminal,
     Activity,
     UserCog,
+    Database,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect } from "react";
@@ -70,6 +71,11 @@ export default function DashboardShell({
             label: "Usage",
             href: "/dashboard/usage",
             icon: <Activity className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
+        },
+        {
+            label: "Databases",
+            href: "/dashboard/database",
+            icon: <Database className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
         },
     ];
 

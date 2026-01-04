@@ -23,6 +23,7 @@ export default function StaticConnectorClient() {
     const [connectorName, setConnectorName] = useState("");
     const [connectorData, setConnectorData] = useState<{ id: string; secret: string } | null>(null);
     const [deploymentUrl, setDeploymentUrl] = useState("");
+    const [hasForked, setHasForked] = useState(false);
 
     const [isLoading, setIsLoading] = useState(false);
     const [showSecret, setShowSecret] = useState(false);
@@ -197,24 +198,106 @@ export default function StaticConnectorClient() {
                                 )}
                             </div>
 
-                            <div className="space-y-2">
-                                <p className="text-sm font-medium">Click below to deploy (keep this tab open!)</p>
-                                <div className="flex gap-4">
-                                    <a
-                                        href={`https://vercel.com/new/clone?repository-url=https://github.com/Sourodip-1/postpipe-connector-template&project-name=postpipe-connector&repository-name=postpipe-connector&env=POSTPIPE_CONNECTOR_ID,POSTPIPE_CONNECTOR_SECRET,MONGODB_URI&envDescription=Paste_Credentials_From_PostPipe&envLink=${encodeURIComponent('https://postpipe.in/dashboard')}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex-1 flex items-center justify-center gap-2 bg-black text-white hover:bg-neutral-800 rounded-md p-3 transition-colors text-sm font-medium"
-                                    >
-                                        <svg viewBox="0 0 76 65" fill="currentColor" className="h-4 w-4"><path d="M37.5274 0L75.0548 65H0L37.5274 0Z" /></svg>
-                                        Deploy to Vercel
-                                    </a>
+                            <div className="space-y-6">
+                                <div className="space-y-2">
+                                    <h4 className="text-sm font-medium">Deployment Pipeline</h4>
+
+                                    {/* Step 1: Fork */}
+                                    <div className={cn(
+                                        "relative overflow-hidden rounded-xl border p-4 transition-all duration-300",
+                                        hasForked ? "bg-muted/40 border-muted" : "bg-card border-primary ring-1 ring-primary/20 shadow-lg"
+                                    )}>
+                                        <div className="flex items-center gap-4">
+                                            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#24292e] text-white shadow-sm">
+                                                <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="0" className="h-7 w-7"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" /></svg>
+                                            </div>
+                                            <div className="flex-1 space-y-1">
+                                                <p className="font-semibold text-base leading-none">Fork Repository</p>
+                                                <p className="text-sm text-muted-foreground">
+                                                    Clone the template to your GitHub account.
+                                                </p>
+                                            </div>
+                                            <Button
+                                                onClick={() => {
+                                                    setHasForked(true);
+                                                    window.open("https://github.com/Sourodip-1/postpipe-connector-template", "_blank");
+                                                }}
+                                                size="lg"
+                                                variant={hasForked ? "outline" : "default"}
+                                                className={cn("gap-2 min-w-[120px] transition-all", !hasForked && "shadow-md hover:shadow-lg hover:scale-105")}
+                                            >
+                                                {hasForked ? (
+                                                    <><Check className="h-4 w-4" /> Forked</>
+                                                ) : (
+                                                    <>Fork Now <ArrowRight className="h-4 w-4" /></>
+                                                )}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <h4 className={cn("text-sm font-medium transition-colors", !hasForked && "text-muted-foreground")}>
+                                            Select Deployment Target
+                                        </h4>
+                                        {!hasForked && (
+                                            <Badge variant="outline" className="text-muted-foreground bg-muted/50">Locked</Badge>
+                                        )}
+                                    </div>
+
+                                    <div className={cn("grid grid-cols-2 gap-4 transition-all duration-500", !hasForked && "opacity-40 grayscale pointer-events-none blur-[1px]")}>
+                                        {/* Vercel */}
+                                        <a
+                                            href="https://vercel.com/new"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="group relative flex flex-col items-center gap-3 rounded-xl border bg-card p-6 text-center shadow-sm transition-all hover:border-black hover:shadow-lg hover:-translate-y-1"
+                                        >
+                                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-black text-white shadow-md group-hover:scale-110 transition-transform duration-300">
+                                                <svg viewBox="0 0 76 65" fill="currentColor" className="h-6 w-6"><path d="M37.5274 0L75.0548 65H0L37.5274 0Z" /></svg>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <p className="font-semibold text-base">Vercel</p>
+                                                <p className="text-xs text-muted-foreground">Recommended Serverless</p>
+                                            </div>
+                                            {/* Hover indicator */}
+                                            <div className="absolute inset-0 rounded-xl border-2 border-black opacity-0 group-hover:opacity-10 transition-opacity pointer-events-none" />
+                                        </a>
+
+                                        {/* Azure */}
+                                        <a
+                                            href="https://portal.azure.com/#create/Microsoft.WebSite"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="group relative flex flex-col items-center gap-3 rounded-xl border bg-card p-6 text-center shadow-sm transition-all hover:border-[#0078D4] hover:shadow-lg hover:-translate-y-1"
+                                        >
+                                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#0078D4]/10 text-[#0078D4] group-hover:bg-[#0078D4] group-hover:text-white transition-all duration-300">
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-7 w-7"><path d="M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16.25" /><line x1="8" y1="16" x2="8.01" y2="16" /><line x1="8" y1="20" x2="8.01" y2="20" /><line x1="12" y1="18" x2="12.01" y2="18" /><line x1="12" y1="22" x2="12.01" y2="22" /><line x1="16" y1="16" x2="16.01" y2="16" /><line x1="16" y1="20" x2="16.01" y2="20" /></svg>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <p className="font-semibold text-base">Azure / Cloud</p>
+                                                <p className="text-xs text-muted-foreground">Container / Node.js</p>
+                                            </div>
+                                            <div className="absolute inset-0 rounded-xl border-2 border-[#0078D4] opacity-0 group-hover:opacity-10 transition-opacity pointer-events-none" />
+                                        </a>
+                                    </div>
+                                    {!hasForked && (
+                                        <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground animate-pulse py-2">
+                                            <AlertCircle className="h-3 w-3" /> Fork the repository above to unlock deployment options
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
-                            <Button variant="outline" className="w-full" onClick={() => setStep(3)}>
-                                I have deployed it <ArrowRight className="ml-2 h-4 w-4" />
-                            </Button>
+                            <div className="flex gap-2 pt-4">
+                                <Button variant="ghost" onClick={() => setStep(1)}>
+                                    Back
+                                </Button>
+                                <Button variant="outline" className="flex-1" onClick={() => setStep(3)}>
+                                    I have deployed it <ArrowRight className="ml-2 h-4 w-4" />
+                                </Button>
+                            </div>
                         </div>
                     </div>
 

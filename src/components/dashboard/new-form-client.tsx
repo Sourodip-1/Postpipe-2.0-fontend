@@ -139,6 +139,7 @@ function SortableField({
 export default function NewFormClient({ onBack, initialData }: NewFormClientProps) {
     const [formName, setFormName] = useState(initialData?.name || "");
     const [connector, setConnector] = useState(initialData?.connectorId || "");
+    const [targetDb, setTargetDb] = useState(initialData?.targetDatabase || "default");
 
     // Convert fields from DB format ({name, type, required}) to Client format ({id, label, type, required})
     const initialFields = initialData?.fields
@@ -209,6 +210,7 @@ export default function NewFormClient({ onBack, initialData }: NewFormClientProp
         const formData = new FormData();
         formData.append('name', formName);
         formData.append('connectorId', connector);
+        if (targetDb) formData.append('targetDatabase', targetDb);
         // Map fields to match simple structure expected by server
         const simplifiedFields = fields.map(f => ({ name: f.label, type: f.type, required: f.required }));
         formData.append('fields', JSON.stringify(simplifiedFields));
@@ -308,6 +310,21 @@ ${fields.map(f => `      <div>
                                         ))}
                                     </SelectContent>
                                 </Select>
+                            </div>
+                            <div className="grid gap-2">
+                                <Label>Target Database</Label>
+                                <Select value={targetDb} onValueChange={setTargetDb}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select target database..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="default">Default (default)</SelectItem>
+                                        {connector && connectors.find((c: any) => c.id === connector)?.databases && Object.keys(connectors.find((c: any) => c.id === connector)?.databases || {}).map((key: string) => (
+                                            <SelectItem key={key} value={key}>{key}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-xs text-muted-foreground">Select where submissions should be routed.</p>
                             </div>
                         </CardContent>
                     </Card>
