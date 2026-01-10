@@ -20,6 +20,29 @@ import {
 
 const releases = [
     {
+        title: "v2.0.2: Docs Update",
+        date: "January 10, 2026",
+        image: "https://res.cloudinary.com/dbaw86kzf/image/upload/v1768027847/55ac531f-1cdd-434f-8417-159d5afb94ae.png",
+        excerpt:
+            "Documentation Overhaul: Unified Glassmorphism Theme & New Architecture Guides.",
+        contributors: [
+            "https://github.com/sourodip-1",
+        ],
+        content: (
+            <div className="prose dark:prose-invert max-w-none">
+                <h3>Documentation Visual Refresh</h3>
+                <p>
+                    We have synchronized the visual theme across the entire documentation suite, bringing the premium "Neural Network" hero and glassmorphism cards to every guide.
+                </p>
+                <ul>
+                    <li><strong>Unified Design System</strong>: All docs now share the same immersive 3D background and layouts.</li>
+                    <li><strong>New "How It Works" Page</strong>: Added a dedicated guide explaining the Static Tunneling vs. Dynamic CLI architecture.</li>
+                    <li><strong>Enhanced Connectors Guide</strong>: The Static Setup guide has been rewritten with a friendlier tone and clearer steps.</li>
+                </ul>
+            </div>
+        ),
+    },
+    {
         title: "v2.0.1: Maintenance Update",
         date: "January 05, 2026",
         image: "https://res.cloudinary.com/dbaw86kzf/image/upload/v1767630171/ab8d63ac-b9aa-47f6-907e-b5ec392cb596.png",
