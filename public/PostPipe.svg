@@ -1,1 +1,6 @@
-<svg version="1.2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500"><defs><image  width="500" height="500" id="img1" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAfQAAAH0AQMAAADxGE3JAAAAAXNSR0IB2cksfwAAAANQTFRFPDw81pckVgAAAHhJREFUeJztyzENAAAMA6DVv+mJ6NfAT64T3/d93/d93/d93/d93/d93/d93/d93/d93/d93/d93/d93/d93/d93/d93/d93/d93/d93/d93/d93/d93/d93/d93/d93/d93/d93/d93/d93/d93/d93/d93/dn/gPUpgH1slVP1AAAAABJRU5ErkJggg=="/></defs><style>.a{fill:#fff}</style><use  href="#img1" x="0" y="0"/><path fill-rule="evenodd" class="a" d="m105 9l338.9 57.7c-292.3 108.5-331 394.6-331.6 429.2z"/></svg>
+<svg version="1.2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500">
+	<style>
+		.s0 { fill: #ffffff } 
+	</style>
+	<path fill-rule="evenodd" class="s0" d="m105 9l338.9 57.7c-292.3 108.5-331 394.6-331.6 429.2z"/>
+</svg>
