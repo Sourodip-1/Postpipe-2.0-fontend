@@ -60,6 +60,7 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
+      { url: '/PostPipe-Black.png' },
       { url: '/PostPipe-Black.svg', media: '(prefers-color-scheme: light)' },
       { url: '/PostPipe.svg', media: '(prefers-color-scheme: dark)' },
     ],
