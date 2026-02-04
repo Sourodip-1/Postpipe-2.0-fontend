@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { getForm, getConnector, incrementSubmissionCount, getUserDatabaseConfig } from '../../../../../lib/server-db';
+import { ensureFullUrl } from '../../../../../lib/utils';
 
 export async function POST(
   req: NextRequest,
@@ -86,7 +87,7 @@ export async function POST(
 
     // 4. Forward to Connector Webhook
     // In real PostPipe, this happens asynchronously via a queue.
-    const ingestUrl = `${connector.url}/postpipe/ingest`;
+    const ingestUrl = `${ensureFullUrl(connector.url)}/postpipe/ingest`;
 
     console.log(`[Proxy] Prepared Payload:`, JSON.stringify(payload, null, 2));
     console.log(`[Proxy] Forwarding to ${ingestUrl}`);

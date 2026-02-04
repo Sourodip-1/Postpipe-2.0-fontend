@@ -30,18 +30,22 @@ if (mongoKeys.length === 0 && pgKeys.length === 0 && (process.env.DB_TYPE === 'm
 const app = express();
 const PORT = process.env.PORT || 3002;
 
-// Enable CORS for all routes
-app.use(cors());
+// --- Prefix Resolution Helper ---
+const VAR_PREFIX = process.env.POSTPIPE_VAR_PREFIX || "";
 
-// IMPORTANT: We need the raw body for signature verification
-app.use(express.json({
-    verify: (req: any, res, buf) => {
-        req.rawBody = buf.toString();
+function getPrefixedEnv(key: string): string | undefined {
+    if (VAR_PREFIX) {
+        const prefixed = `${VAR_PREFIX}_${key}`;
+        if (process.env[prefixed]) {
+            console.log(`[Config] Resolved '${key}' from prefixed variable: ${prefixed}`);
+            return process.env[prefixed];
+        }
     }
-}));
+    return process.env[key];
+}
 
-const CONNECTOR_ID = process.env.POSTPIPE_CONNECTOR_ID;
-const CONNECTOR_SECRET = process.env.POSTPIPE_CONNECTOR_SECRET;
+const CONNECTOR_ID = getPrefixedEnv('POSTPIPE_CONNECTOR_ID');
+const CONNECTOR_SECRET = getPrefixedEnv('POSTPIPE_CONNECTOR_SECRET');
 
 if (!CONNECTOR_ID || !CONNECTOR_SECRET) {
     console.error("❌ CRITICAL ERROR: POSTPIPE_CONNECTOR_ID or POSTPIPE_CONNECTOR_SECRET is missing.");
@@ -74,6 +78,20 @@ function rateLimit(req: Request, res: Response, next: express.NextFunction) {
 
     next();
 }
+
+app.use(cors());
+
+// --- Body Parsing Middleware ---
+// IMPORTANT: We use a custom verify function to capture the raw body buffer
+// for HMAC signature verification.
+app.use(express.json({
+    limit: '5mb',
+    verify: (req: any, res, buf) => {
+        req.rawBody = buf;
+    }
+}));
+
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
 app.use(rateLimit);
 // ----------------------------------------
@@ -259,7 +277,8 @@ app.get('/api/postpipe/forms/:formId/submissions', async (req: Request, res: Res
             }
         }
 
-        const adapter = getAdapter(dbType as string);
+        // Pass the database type from the parsed databaseConfig or dbType query parameter
+        const adapter = getAdapter((dbConfigParsed?.type || dbType) as string);
         // Ensure strictly connected/reconnected if needed
         await adapter.connect({ databaseConfig: dbConfigParsed });
 
@@ -269,6 +288,16 @@ app.get('/api/postpipe/forms/:formId/submissions', async (req: Request, res: Res
         console.error("Query Error:", e);
         return res.status(500).json({ status: 'error', message: String(e) });
     }
+});
+
+// --- Diagnostic Catch-All ---
+app.use((req, res) => {
+    console.warn(`[404] Route Not Found: ${req.method} ${req.originalUrl} from IP: ${req.ip}`);
+    res.status(404).json({ 
+        error: "Not Found", 
+        message: `Route ${req.originalUrl} does not exist on this connector.`,
+        availableRoutes: ["POST /postpipe/ingest", "GET /postpipe/data", "GET /api/postpipe/forms/:formId/submissions"]
+    });
 });
 
 if (require.main === module) {

@@ -6,6 +6,7 @@ import { getSession } from '../../lib/auth/actions';
 export async function registerConnectorAction(formData: FormData) {
   const url = formData.get('url') as string; // Optional now
   const name = formData.get('name') as string;
+  const envPrefix = formData.get('envPrefix') as string;
 
   try {
     const session = await getSession();
@@ -13,7 +14,7 @@ export async function registerConnectorAction(formData: FormData) {
       return { error: 'Unauthorized' };
     }
 
-    const connector = await registerConnector(url || null, name, session.userId);
+    const connector = await registerConnector(url || null, name, session.userId, envPrefix);
     return {
       success: true,
       connectorId: connector.id,

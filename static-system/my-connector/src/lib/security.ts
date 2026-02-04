@@ -13,7 +13,7 @@ import { PostPipeIngestPayload } from '../types';
 const MAX_SKEW_SECONDS = 300; // 5 minutes allow skew
 
 export function verifySignature(
-  rawBody: string, 
+  rawBody: string | Buffer, 
   signature: string, 
   secret: string
 ): boolean {

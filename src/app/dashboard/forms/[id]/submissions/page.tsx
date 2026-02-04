@@ -6,6 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import SubmissionsClient from '@/components/dashboard/submissions-client';
 import { getForm, getConnector, getUserDatabaseConfig } from '@/lib/server-db';
+import { ensureFullUrl } from '@/lib/utils';
 import { getSession } from '@/lib/auth/actions';
 
 export const metadata: Metadata = {
@@ -102,7 +103,7 @@ export default async function SubmissionsPage({ params }: { params: { id: string
                     databaseConfig: JSON.stringify(databaseConfig || {})
                 });
 
-                const fetchUrl = `${connector.url}/postpipe/data?${queryParams.toString()}`;
+                const fetchUrl = `${ensureFullUrl(connector.url)}/postpipe/data?${queryParams.toString()}`;
 
                 const res = await fetch(fetchUrl, {
                     headers: {

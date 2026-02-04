@@ -99,6 +99,13 @@ export class MongoAdapter implements DatabaseAdapter {
     }
 
     // 3. Default Environment Variable
+    const prefix = process.env.POSTPIPE_VAR_PREFIX ? `${process.env.POSTPIPE_VAR_PREFIX}_` : "";
+    const prefixedUri = process.env[`${prefix}MONGODB_URI`];
+    if (prefixedUri) {
+      console.log(`[MongoAdapter] -> Found via prefixed default (MONGODB_URI)`);
+      return prefixedUri;
+    }
+
     if (this.defaultUri) {
       console.log(`[MongoAdapter] -> Found via default (MONGODB_URI)`);
       return this.defaultUri;

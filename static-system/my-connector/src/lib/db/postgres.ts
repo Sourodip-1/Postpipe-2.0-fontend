@@ -39,9 +39,14 @@ export class PostgresAdapter implements DatabaseAdapter {
         }
 
         // 3. Default Environment Variables
-        const defaultUri = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+        const prefix = process.env.POSTPIPE_VAR_PREFIX ? `${process.env.POSTPIPE_VAR_PREFIX}_` : "";
+        const defaultUri = process.env[`${prefix}DATABASE_URL`] || 
+                           process.env[`${prefix}POSTGRES_URL`] || 
+                           process.env.DATABASE_URL || 
+                           process.env.POSTGRES_URL;
+                           
         if (defaultUri) {
-            console.log(`[PostgresAdapter] -> Found via default (DATABASE_URL/POSTGRES_URL)`);
+            console.log(`[PostgresAdapter] -> Found via ${prefix ? 'prefixed ' : ''}default (DATABASE_URL/POSTGRES_URL)`);
             return defaultUri;
         }
 

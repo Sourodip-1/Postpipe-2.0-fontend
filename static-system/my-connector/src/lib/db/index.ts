@@ -3,7 +3,7 @@ import { MongoAdapter } from './mongodb';
 import { PostgresAdapter } from './postgres';
 
 export function getAdapter(forcedType?: string): DatabaseAdapter {
-  const type = forcedType?.toLowerCase() || process.env.DB_TYPE?.toLowerCase();
+  const type = (forcedType || process.env.DB_TYPE || "").toLowerCase();
 
   switch (type) {
     case 'mongodb':

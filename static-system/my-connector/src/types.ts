@@ -26,3 +26,12 @@ export interface ConnectorConfig {
   connectorSecret: string;
   port: number;
 }
+
+// Extend Express Request to include rawBody
+declare global {
+  namespace Express {
+    interface Request {
+      rawBody?: Buffer;
+    }
+  }
+}

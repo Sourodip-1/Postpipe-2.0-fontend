@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyApiToken } from '@/lib/api-auth';
 import { getConnector } from '@/lib/server-db';
+import { ensureFullUrl } from '@/lib/utils';
 
 export async function GET(
     req: NextRequest,
@@ -65,7 +66,7 @@ export async function GET(
             console.log(`[API] No alias found for '${dbName}' in connector, using as direct URI key.`);
         }
 
-        const connectorUrl = connector.url.replace(/\/$/, "");
+        const connectorUrl = ensureFullUrl(connector.url);
         const targetUrl = new URL(`${connectorUrl}/postpipe/data`);
         targetUrl.searchParams.set('formId', formId);
         targetUrl.searchParams.set('targetDatabase', dbName); // Keep original alias as useful metadata
