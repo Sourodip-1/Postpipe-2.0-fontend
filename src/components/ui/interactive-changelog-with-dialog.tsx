@@ -20,6 +20,29 @@ import {
 
 const releases = [
     {
+        title: "v2.1.0: CCDRS (Cross Database Data Routing System)",
+        date: "February 07, 2026",
+        image: "https://res.cloudinary.com/dbaw86kzf/image/upload/v1770438091/postpipe_postgres_nap4nn.png",
+        excerpt:
+            "Implemented CCDRS - A high-performance routing layer that allows a single connector to dynamically bridge data across multiple physical databases.",
+        contributors: [
+            "https://github.com/Sourodip-1",
+        ],
+        content: (
+            <div className="prose dark:prose-invert max-w-none">
+                <h3>Cross Database Data Routing System (CCDRS)</h3>
+                <p>
+                    PostPipe 2.0 now supports native data routing across multiple databases from a single connector instance. This contribution by <strong>Sourodip</strong> enables enterprise-grade data orchestration without additional infrastructure.
+                </p>
+                <ul>
+                    <li><strong>Dynamic Routing</strong>: Map form submissions to specific databases using environment variable suffixes.</li>
+                    <li><strong>Smart Resolution</strong>: Automatic detection of database types (Mongo/Postgres) per-request.</li>
+                    <li><strong>Zero Latency Proxy</strong>: High-efficiency data tunneling to local VPC databases.</li>
+                </ul>
+            </div>
+        ),
+    },
+    {
         title: "v2.0.2: Docs Update",
         date: "January 10, 2026",
         image: "https://res.cloudinary.com/dbaw86kzf/image/upload/v1768027847/55ac531f-1cdd-434f-8417-159d5afb94ae.png",

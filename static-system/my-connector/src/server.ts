@@ -94,6 +94,21 @@ app.use(express.json({
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
 app.use(rateLimit);
+
+// --- Health Check / Diagnostic ---
+app.get('/', (req, res) => {
+    res.json({
+        status: 'ok',
+        service: 'PostPipe Connector',
+        version: '1.0.0',
+        config: {
+            dbTypeDetected: process.env.DB_TYPE || 'InMemory',
+            hasConnectorId: !!process.env.POSTPIPE_CONNECTOR_ID,
+            mongoDetected: Object.keys(process.env).some(k => k.startsWith('MONGODB_URI')),
+            pgDetected: Object.keys(process.env).some(k => k.startsWith('POSTGRES_URL') || k.startsWith('DATABASE_URL'))
+        }
+    });
+});
 // ----------------------------------------
 
 // --- Core Authentication Middleware ---
@@ -303,7 +318,8 @@ app.use((req, res) => {
 if (require.main === module) {
     app.listen(PORT, () => {
         console.log(`🔒 PostPipe Connector listening on port ${PORT}`);
-        console.log(`📝 Mode: ${process.env.DB_TYPE || 'InMemory'}`);
+        console.log(`📝 Default Mode: ${process.env.DB_TYPE || 'InMemory'}`);
+        console.log(`🌐 Health Check: http://localhost:${PORT}/`);
     });
 }
 

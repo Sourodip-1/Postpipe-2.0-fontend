@@ -170,7 +170,7 @@ export default function StaticConnectorClient() {
                                     <ShieldCheck className="h-4 w-4" /> Important: Copy Credentials
                                 </h4>
                                 <p className="text-xs text-amber-600/90 mb-4">
-                                    You will need to paste these into Vercel/Azure during deployment.
+                                    You will need to paste these into Vercel/Azure during deployment. Make sure to also add your **Database Connection String** (e.g., `MONGODB_URI` or `POSTGRES_URL`) and set the install command to `npm install`.
                                 </p>
 
                                 {connectorData && (

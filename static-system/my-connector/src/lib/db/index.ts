@@ -2,19 +2,32 @@ import { DatabaseAdapter, PostPipeIngestPayload } from '../../types';
 import { MongoAdapter } from './mongodb';
 import { PostgresAdapter } from './postgres';
 
+const adapterCache: Record<string, DatabaseAdapter> = {};
+
 export function getAdapter(forcedType?: string): DatabaseAdapter {
   const type = (forcedType || process.env.DB_TYPE || "").toLowerCase();
 
+  if (adapterCache[type]) {
+    return adapterCache[type];
+  }
+
+  let adapter: DatabaseAdapter;
   switch (type) {
     case 'mongodb':
-      return new MongoAdapter();
+      adapter = new MongoAdapter();
+      break;
     case 'postgres':
     case 'postgresql':
-      return new PostgresAdapter();
+      adapter = new PostgresAdapter();
+      break;
     default:
       console.warn(`[Config] No valid DB_TYPE set (got '${type}'). Defaulting to Memory (Dry Run).`);
-      return new MemoryAdapter();
+      adapter = new MemoryAdapter();
+      break;
   }
+
+  adapterCache[type] = adapter;
+  return adapter;
 }
 
 class MemoryAdapter implements DatabaseAdapter {
