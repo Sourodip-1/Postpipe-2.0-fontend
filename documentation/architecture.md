@@ -48,7 +48,8 @@ To ensure design consistency between the SaaS platform and the generated user da
 The architecture is designed to support the Zero Trust flow:
 
 1.  **Ingress**: A request hits `apps/web` (The Lab).
-2.  **Routing**: The Lab looks up the `ConnectorID`.
-3.  **Tunneling**: The Lab forwards the payload to the specific active Connector instance running in the user's infrastructure.
-4.  **Execution**: The Connector (scaffolded via `cli/`) executes the DB operation.
-5.  **Egress**: The result is sent back to `apps/web` and displayed to the user.
+2.  **Routing**: The Lab looks up the `ConnectorID` and prepares the signed payload.
+3.  **Tunneling**: The Lab forwards the payload to the specific active Connector instance.
+4.  **Verification**: The Connector verifies the `X-PostPipe-Signature`.
+5.  **Smart Execution**: The Connector resolves the `Target Database` and `DB Type` (Smart Resolution) and executes the operation.
+6.  **Egress**: The result is sent back to `apps/web` and displayed to the user.

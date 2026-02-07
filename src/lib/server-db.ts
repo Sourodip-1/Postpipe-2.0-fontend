@@ -1,4 +1,5 @@
 import { MongoClient } from 'mongodb';
+import { ensureFullUrl } from './utils';
 
 // --- Types ---
 export interface Connector {
@@ -15,7 +16,9 @@ export interface Connector {
   databases?: Record<string, {
     uri: string;
     dbName: string;
+    type?: 'mongodb' | 'postgres';
   }>;
+  envPrefix?: string; // Optional prefix for env vars (e.g. "PROD")
 }
 
 export interface UserConnectorsDocument {
@@ -110,7 +113,7 @@ export async function getDB() {
 }
 
 // --- Connectors ---
-export async function registerConnector(url: string | null, name: string = 'My Connector', userId?: string): Promise<Connector> {
+export async function registerConnector(url: string | null, name: string = 'My Connector', userId?: string, envPrefix?: string): Promise<Connector> {
   const db = await getDB();
 
   if (!userId) {
@@ -118,7 +121,7 @@ export async function registerConnector(url: string | null, name: string = 'My C
   }
 
   // Clean URL if provided, otherwise PENDING
-  let cleanUrl = url ? url.replace(/\/$/, "") : "PENDING";
+  let cleanUrl = url ? ensureFullUrl(url) : "PENDING";
 
   // Check if user already has this connector
   const existingDoc = await db.collection<UserConnectorsDocument>('user_connectors').findOne({
@@ -136,7 +139,8 @@ export async function registerConnector(url: string | null, name: string = 'My C
     id: `conn_${Math.random().toString(36).substr(2, 9)}`,
     secret: `sk_live_${Math.random().toString(36).substr(2, 16)}${Math.random().toString(36).substr(2, 16)}`,
     url: cleanUrl,
-    name
+    name,
+    envPrefix: envPrefix || undefined
   };
 
   await db.collection<UserConnectorsDocument>('user_connectors').updateOne(
@@ -150,7 +154,7 @@ export async function registerConnector(url: string | null, name: string = 'My C
 
 export async function updateConnectorUrl(id: string, url: string, userId: string): Promise<void> {
   const db = await getDB();
-  const cleanUrl = url.replace(/\/$/, "");
+  const cleanUrl = ensureFullUrl(url);
 
   // Verify ownership
   const doc = await db.collection<UserConnectorsDocument>('user_connectors').findOne({

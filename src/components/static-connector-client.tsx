@@ -165,41 +165,44 @@ export default function StaticConnectorClient() {
                         </div>
 
                         <div className="pl-14 space-y-6">
-                            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
+                            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-5">
                                 <h4 className="font-semibold text-amber-600 mb-2 flex items-center gap-2">
-                                    <ShieldCheck className="h-4 w-4" /> Important: Copy These First
+                                    <ShieldCheck className="h-4 w-4" /> Important: Copy Credentials
                                 </h4>
-                                <p className="text-sm text-amber-600/90 mb-4">
-                                    You will need to paste these into Vercel/Azure during deployment.
+                                <p className="text-xs text-amber-600/90 mb-4">
+                                    You will need to paste these into Vercel/Azure during deployment. Make sure to also add your **Database Connection String** (e.g., `MONGODB_URI` or `POSTGRES_URL`) and set the install command to `npm install`.
                                 </p>
 
                                 {connectorData && (
-                                    <div className="space-y-3 bg-background/50 p-3 rounded border">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-xs font-mono text-muted-foreground">POSTPIPE_CONNECTOR_ID</span>
-                                            <div className="flex items-center gap-2">
-                                                <code className="text-xs font-mono bg-muted px-2 py-1 rounded">{connectorData.id}</code>
-                                                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => copyToClipboard(`POSTPIPE_CONNECTOR_ID=${connectorData.id}`, "ID")}><Copy className="h-3 w-3" /></Button>
+                                    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                                        <div className="bg-muted/40 rounded-xl p-5 border border-dashed relative group border-primary/10">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h4 className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground flex items-center gap-2">
+                                                    <Terminal className="h-3.5 w-3.5" /> Env Vars
+                                                </h4>
+                                                <Badge variant="outline" className="text-[9px] bg-primary/5 text-primary border-primary/10">
+                                                    Vercel Friendly
+                                                </Badge>
                                             </div>
-                                        </div>
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-xs font-mono text-muted-foreground">POSTPIPE_CONNECTOR_SECRET</span>
-                                            <div className="flex items-center gap-2">
-                                                <code className="text-xs font-mono bg-muted px-2 py-1 rounded">
-                                                    {showSecret ? connectorData.secret : "••••••••••••••••"}
-                                                </code>
-                                                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setShowSecret(!showSecret)}>
-                                                    {showSecret ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                                                </Button>
-                                                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => copyToClipboard(`POSTPIPE_CONNECTOR_SECRET=${connectorData.secret}`, "Secret")}><Copy className="h-3 w-3" /></Button>
+                                            <div className="relative">
+                                                <pre className="text-[11px] font-mono leading-relaxed text-muted-foreground overflow-x-auto bg-background/80 p-4 rounded-lg border border-primary/5">
+                                                    {`POSTPIPE_CONNECTOR_ID=${connectorData.id}\n`}
+                                                    {`POSTPIPE_CONNECTOR_SECRET=`}
+                                                    {showSecret ? connectorData.secret : "sk_live_•••••••••••••••••••••"}
+                                                </pre>
+                                                <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <Button size="icon" variant="ghost" className="h-7 w-7 hover:bg-primary/10" onClick={() => setShowSecret(!showSecret)}>
+                                                        {showSecret ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                                                    </Button>
+                                                    <Button size="icon" variant="ghost" className="h-7 w-7 hover:bg-primary/10" onClick={() => copyToClipboard(`POSTPIPE_CONNECTOR_ID=${connectorData.id}\nPOSTPIPE_CONNECTOR_SECRET=${connectorData.secret}`, "Credentials")}>
+                                                        <Copy className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-xs font-mono text-muted-foreground">DB_TYPE</span>
-                                            <div className="flex items-center gap-2">
-                                                <code className="text-xs font-mono bg-muted px-2 py-1 rounded">mongodb</code>
-                                                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => copyToClipboard(`DB_TYPE=mongodb`, "DB Type")}><Copy className="h-3 w-3" /></Button>
-                                            </div>
+                                            <p className="text-[10px] mt-4 text-amber-600/70 italic border-t border-amber-500/10 pt-3 flex items-center gap-2">
+                                                <ShieldCheck className="h-3.5 w-3.5" />
+                                                Database types (Mongo/Postgres) are now resolved per-form in the Dashboard.
+                                            </p>
                                         </div>
                                     </div>
                                 )}

@@ -14,6 +14,7 @@ import {
   createSystem,
   System
 } from '../../lib/server-db';
+import { ensureFullUrl } from '../../lib/utils';
 
 import { getSession } from '../../lib/auth/actions';
 
@@ -56,10 +57,10 @@ export async function getDashboardData() {
 
     return {
       ...f,
-      connectorUrl: connector.url,
+      connectorUrl: ensureFullUrl(connector.url),
       readToken: token,
       publicSubmitUrl: `http://localhost:3000/api/public/submit/${f.id}`,
-      connectorGetterUrl: `${connector.url}/api/postpipe/forms/${f.id}/submissions`
+      connectorGetterUrl: `${ensureFullUrl(connector.url)}/api/postpipe/forms/${f.id}/submissions`
     };
   });
 

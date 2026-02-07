@@ -1,5 +1,4 @@
 "use client";
-// Force refresh
 
 import { useState } from "react";
 import {
@@ -60,6 +59,7 @@ type Connector = {
         uri: string;
         dbName: string;
     }>;
+    envPrefix?: string;
     status: "Verified" | "Not Verified";
     lastUsed: string;
 };
@@ -78,6 +78,7 @@ export default function ConnectorsClient({ initialConnectors, databaseConfig }: 
     // New Connector State
     const [newName, setNewName] = useState("");
     const [newUrl, setNewUrl] = useState("");
+    const [envPrefix, setEnvPrefix] = useState("");
     const [targetDatabase, setTargetDatabase] = useState("default");
     const [isRegistering, setIsRegistering] = useState(false);
 
@@ -97,9 +98,6 @@ export default function ConnectorsClient({ initialConnectors, databaseConfig }: 
             setConnectors(prev => prev.filter(c => c.id !== id));
 
             // Server Action
-            // Note: DB expects the string UUID (c.id from props), but our local state id might be _id
-            // Let's pass the connectorId (the UUID) if that's what deleteConnector expects
-            // Looking at server-db.ts, deleteConnector uses 'id' which is the UUID.
             await deleteConnectorAction(connectorId);
 
             toast({ title: "Connector Deleted", description: "The connector has been removed." });
@@ -123,6 +121,7 @@ export default function ConnectorsClient({ initialConnectors, databaseConfig }: 
         const FormDataObj = new FormData();
         FormDataObj.append('name', newName);
         FormDataObj.append('url', newUrl);
+        if (envPrefix) FormDataObj.append('envPrefix', envPrefix.toUpperCase());
         if (targetDatabase && targetDatabase !== "default") {
             FormDataObj.append('targetDatabase', targetDatabase);
         }
@@ -138,6 +137,7 @@ export default function ConnectorsClient({ initialConnectors, databaseConfig }: 
                     name: newName,
                     secret: res.connectorSecret || '',
                     url: newUrl,
+                    envPrefix: envPrefix.toUpperCase() || undefined,
                     targetDatabase: targetDatabase === "default" ? undefined : targetDatabase,
                     status: "Verified",
                     lastUsed: "Just now",
@@ -146,6 +146,7 @@ export default function ConnectorsClient({ initialConnectors, databaseConfig }: 
                 setConnectors(prev => [...prev, newConnector]);
                 setNewName("");
                 setNewUrl("");
+                setEnvPrefix("");
                 setIsDialogOpen(false);
                 toast({ title: "Connector Registered", description: "You can now use this connector in your forms." });
             }
@@ -199,8 +200,16 @@ export default function ConnectorsClient({ initialConnectors, databaseConfig }: 
                                     onChange={(e) => setNewUrl(e.target.value)}
                                 />
                             </div>
-
-
+                            <div className="grid gap-2">
+                                <Label htmlFor="prefix">Variable Prefix (Optional)</Label>
+                                <Input
+                                    id="prefix"
+                                    placeholder="e.g. STAGING"
+                                    value={envPrefix}
+                                    onChange={(e) => setEnvPrefix(e.target.value.toUpperCase())}
+                                />
+                                <p className="text-[0.7rem] text-muted-foreground">Used to avoid environment variable conflicts in Vercel.</p>
+                            </div>
                         </div>
                         <DialogFooter>
                             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
@@ -292,6 +301,48 @@ export default function ConnectorsClient({ initialConnectors, databaseConfig }: 
                                 <p className="text-[0.8rem] text-muted-foreground pt-1">
                                     This secret key acts as the password for your connector.
                                 </p>
+                            </div>
+
+                            {/* Vercel Sync Helper */}
+                            <div className="md:col-span-2 mt-2 pt-6 border-t border-dashed">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                        <div className="h-6 w-6 rounded bg-[#000] flex items-center justify-center">
+                                            <svg width="12" height="12" viewBox="0 0 76 65" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M37.5274 0L75.0548 65H0L37.5274 0Z" fill="white" /></svg>
+                                        </div>
+                                        <h4 className="text-sm font-semibold">Vercel Deployment Variables</h4>
+                                    </div>
+                                    <Badge variant="outline" className="text-[10px] uppercase font-bold text-muted-foreground border-dashed">
+                                        Recommended
+                                    </Badge>
+                                </div>
+                                <div className="bg-muted/30 rounded-xl p-4 border border-dashed relative group">
+                                    <pre className="text-[11px] font-mono leading-relaxed text-muted-foreground overflow-x-auto">
+                                        {connector.envPrefix ? `# Prefixed variables for ${connector.name}\n` : ""}
+                                        {connector.envPrefix ? `POSTPIPE_VAR_PREFIX=${connector.envPrefix}\n` : ""}
+                                        {`${connector.envPrefix ? connector.envPrefix + '_' : ''}POSTPIPE_CONNECTOR_ID=${connector.id}\n`}
+                                        {`${connector.envPrefix ? connector.envPrefix + '_' : ''}POSTPIPE_CONNECTOR_SECRET=`}
+                                        {visibleSecrets[connector.id] ? connector.secret : "sk_live_•••••••••••••••••••••"}
+                                    </pre>
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        className="absolute top-2 right-2 h-7 gap-1 text-[10px]"
+                                        onClick={() => {
+                                            const vars = [
+                                                connector.envPrefix ? `POSTPIPE_VAR_PREFIX=${connector.envPrefix}` : "",
+                                                `${connector.envPrefix ? connector.envPrefix + '_' : ''}POSTPIPE_CONNECTOR_ID=${connector.id}`,
+                                                `${connector.envPrefix ? connector.envPrefix + '_' : ''}POSTPIPE_CONNECTOR_SECRET=${connector.secret}`
+                                            ].filter(Boolean).join('\n');
+                                            copyToClipboard(vars, "Vercel Variables");
+                                        }}
+                                    >
+                                        <Copy className="h-3 w-3" /> Copy All
+                                    </Button>
+                                    <p className="text-[10px] mt-3 text-muted-foreground/60 italic">
+                                        Paste these into your Vercel Project Settings → Environment Variables.
+                                    </p>
+                                </div>
                             </div>
                         </CardContent>
                         <CardFooter className="bg-muted/40 p-4 flex justify-between">

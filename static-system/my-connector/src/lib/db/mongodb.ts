@@ -76,58 +76,73 @@ export class MongoAdapter implements DatabaseAdapter {
     return val;
   }
 
-  private getTargetConfig(payload?: PostPipeIngestPayload): { uri: string, dbName: string } {
-    // 1. Determine requested target from Payload (support both naming conventions)
-    const targetName = (payload as any)?.targetDatabase || payload?.targetDb;
+  private resolveUri(targetName?: string, databaseConfig?: any): string | undefined {
+    // 1. Explicit Payload Config
+    if (databaseConfig?.uri) {
+      const envVarName = databaseConfig.uri;
+      const uri = process.env[envVarName];
+      if (uri) {
+        console.log(`[MongoAdapter] -> Found via explicit payload config: ${envVarName}`);
+        return uri;
+      }
+      console.warn(`[MongoAdapter] -> Payload requested env var ${envVarName} but it's MISSING.`);
+    }
 
-    // 2. Dynamic Routing: Check Environment Variables directly
-    // This allows routing to work WITHOUT db-routes.json if Env Vars are set.
+    // 2. Dynamic Routing (MONGODB_URI_{TARGET})
     if (targetName) {
-      const dynamicKey = `MONGODB_URI_${targetName.toUpperCase()}`; // e.g. MONGODB_URI_SECONDARY
+      const dynamicKey = `MONGODB_URI_${targetName.toUpperCase()}`;
       const dynamicUri = process.env[dynamicKey];
-
-      console.log(`[MongoAdapter] Debug: target="${targetName}", looking for env var "${dynamicKey}"`);
-
       if (dynamicUri) {
-        console.log(`[MongoAdapter] Dynamic Logic: Found ${dynamicKey}, routing to '${targetName}'`);
-        return { uri: dynamicUri, dbName: `postpipe_${targetName}` };
-      } else {
-        console.warn(`[MongoAdapter] Warning: target '${targetName}' requested but env var "${dynamicKey}" not found.`);
+        console.log(`[MongoAdapter] -> Found via dynamic routing: ${dynamicKey}`);
+        return dynamicUri;
       }
     }
 
-    // 3. Config-based Rules (Only if config exists)
-    let ruleTarget = this.config?.defaultTarget || 'default';
-
-    if (payload && this.config?.rules) {
-      for (const rule of this.config.rules) {
-        const value = (payload as any)[rule.field];
-        if (value && new RegExp(rule.match).test(String(value))) {
-          console.log(`[MongoAdapter] Routing Rule Matched: ${rule.field}="${value}" matches /${rule.match}/ -> ${rule.target}`);
-          ruleTarget = rule.target;
-          break;
-        }
-      }
+    // 3. Default Environment Variable
+    const prefix = process.env.POSTPIPE_VAR_PREFIX ? `${process.env.POSTPIPE_VAR_PREFIX}_` : "";
+    const prefixedUri = process.env[`${prefix}MONGODB_URI`];
+    if (prefixedUri) {
+      console.log(`[MongoAdapter] -> Found via prefixed default (MONGODB_URI)`);
+      return prefixedUri;
     }
 
-    // 4. Resolve Target from Config (Fallback to db-routes.json)
-    if (this.config) {
-      // If we found a specific target via rules, or use default
-      // Note: If request had targetName but no env var found, we might want to check config for that name too?
-      // Let's check config for the requested targetName first if it exists, otherwise use ruleTarget
-      const effectiveTarget = (targetName && this.config.databases?.[targetName]) ? targetName : ruleTarget;
-
-      const dbConf = this.config.databases?.[effectiveTarget];
-      if (dbConf) {
-        const uri = this.resolveValue(dbConf.uri) || this.defaultUri;
-        const dbName = this.resolveValue(dbConf.dbName) || this.defaultDbName;
-        return { uri, dbName };
-      }
+    if (this.defaultUri) {
+      console.log(`[MongoAdapter] -> Found via default (MONGODB_URI)`);
+      return this.defaultUri;
     }
 
-    // 5. Fallback to Defaults
-    // If no config, no dynamic env var found, return default URI
-    return { uri: this.defaultUri, dbName: this.defaultDbName };
+    // 4. Fallback: Scan process.env for ANY MONGODB_URI_* (Last Resort)
+    console.log(`[MongoAdapter] -> Searching fallback keys...`);
+    const fallbackKeys = Object.keys(process.env).filter(k => 
+      k.startsWith('MONGODB_URI_') && process.env[k]
+    );
+    
+    if (fallbackKeys.length > 0) {
+      const fallbackKey = fallbackKeys[0];
+      console.log(`[MongoAdapter] -> Fallback match: ${fallbackKey}`);
+      return process.env[fallbackKey];
+    }
+
+    return undefined;
+  }
+
+  private getTargetConfig(payload?: PostPipeIngestPayload): { uri: string, dbName: string } {
+    const { targetDatabase, databaseConfig } = (payload || {}) as any;
+    const targetName = targetDatabase || (payload as any)?.targetDb;
+
+    console.log(`[MongoAdapter] Resolving config for target: '${targetName}'`);
+    const uri = this.resolveUri(targetName, databaseConfig) || "";
+    
+    // Default dbName resolution
+    let dbName = this.defaultDbName;
+    if (databaseConfig?.dbName) {
+      dbName = databaseConfig.dbName;
+    } else if (targetName) {
+      dbName = `postpipe_${targetName}`;
+    }
+
+    console.log(`[MongoAdapter] Resolved: DB=[${dbName}] URI=[${uri ? 'SET' : 'MISSING'}]`);
+    return { uri, dbName };
   }
 
   private async getClient(uri: string): Promise<MongoClient> {
@@ -135,11 +150,11 @@ export class MongoAdapter implements DatabaseAdapter {
       return connectionPool.get(uri)!;
     }
 
-    console.log(`[MongoAdapter] Creating new connection pool for URI: ${uri.replace(/\/\/.*@/, '//***@')}`); // Mask secret
+    console.log(`[MongoAdapter] Establishing connection to host: ${uri.split('@').pop() || 'localhost'}`); 
 
     // Create promise and store it immediately
     const clientPromise = new MongoClient(uri).connect().then(client => {
-      console.log(`[MongoAdapter] Connected to MongoDB host.`);
+      console.log(`[MongoAdapter] Connection established successfully.`);
       return client;
     });
 
@@ -149,7 +164,7 @@ export class MongoAdapter implements DatabaseAdapter {
 
   // NOTE: For multi-db, "connect" is lazy or just pre-checks the default.
   // We'll actually connect in `insert` to the *correct* DB.
-  async connect(): Promise<void> {
+  async connect(context?: any): Promise<void> {
     // Optional: Pre-warm the default connection
     try {
       const { uri } = this.getTargetConfig();
@@ -160,33 +175,10 @@ export class MongoAdapter implements DatabaseAdapter {
   }
 
   async insert(payload: PostPipeIngestPayload): Promise<void> {
-    // 1. EXTRACT CONFIG FROM PAYLOAD
-    const { targetDatabase, databaseConfig } = payload as any;
-    let uri: string | undefined;
-    let dbName: string = "postpipe"; // default
-
-    if (databaseConfig) {
-      // CASE A: Frontend sent explicit config (Dependency Injection)
-
-      // The frontend sends the VARIABLE NAME, so we look it up in process.env
-      // This requires the Connector to have the same .env variables as Frontend
-      const envVarName = databaseConfig.uri;
-      uri = process.env[envVarName];
-
-      if (databaseConfig.dbName) {
-        dbName = databaseConfig.dbName;
-      }
-
-      console.log(`[MongoAdapter] Using injected config: ${envVarName} -> ${uri ? 'Found' : 'MISSING'}`);
-    } else {
-      // CASE B: Legacy / Fallback (Old behavior)
-      const config = this.getTargetConfig(payload);
-      uri = config.uri;
-      dbName = config.dbName;
-    }
+    const { uri, dbName } = this.getTargetConfig(payload);
 
     if (!uri) {
-      throw new Error(`No MongoDB URI resolved. Target: ${targetDatabase || payload.targetDb}`);
+      throw new Error(`[MongoAdapter] No MongoDB URI resolved. Available relevant keys: ${Object.keys(process.env).filter(k => k.includes('MONGO'))}`);
     }
 
     // 2. Get connection (cached)
@@ -206,39 +198,16 @@ export class MongoAdapter implements DatabaseAdapter {
   }
 
   async query(formId: string, options?: any): Promise<PostPipeIngestPayload[]> {
-    // 1. Determine Database URI & Name
-    let targetUri = this.defaultUri;
-    let targetDbName = this.defaultDbName;
-
-    if (options?.databaseConfig?.uri) {
-      const envVarName = options.databaseConfig.uri.trim(); // Ensure no whitespace
-      const resolvedUri = process.env[envVarName];
-      console.log(`[MongoAdapter] Lookup URI for key: '${envVarName}' -> Found: ${!!resolvedUri ? 'YES' : 'NO'}`);
-
-      if (resolvedUri) {
-        targetUri = resolvedUri;
-        targetDbName = options.databaseConfig.dbName || targetDbName;
-        console.log(`[MongoAdapter] Querying routed DB: ${targetDbName}`);
-      } else {
-        console.warn(`[MongoAdapter] Failed to resolve URI from env var: '${envVarName}'`);
-        const availableKeys = Object.keys(process.env).filter(k => k.startsWith('MONGODB_URI'));
-        console.log(`[MongoAdapter] Available MONGODB_URI_* keys:`, availableKeys);
-      }
-    } else {
-      // Fallback to default config resolution
-      // Fix: Pass targetDatabase from options to getTargetConfig to enable dynamic routing (MONGODB_URI_{TARGET})
-      const config = this.getTargetConfig({ targetDb: options?.targetDatabase } as any);
-      targetUri = config.uri;
-      targetDbName = config.dbName;
-    }
+    const { uri: targetUri, dbName: targetDbName } = this.getTargetConfig({ 
+      targetDatabase: options?.targetDatabase, 
+      databaseConfig: options?.databaseConfig 
+    } as any);
 
     if (!targetUri) {
-      console.error("[MongoAdapter] CRITICAL: No MongoDB URI resolved. Config state:", {
-        defaultUri: this.defaultUri ? 'SET' : 'UNSET',
-        hasConfig: !!this.config,
-        options: options
-      });
-      throw new Error("No MongoDB URI resolved for query.");
+      console.error("[MongoAdapter] CRITICAL: No MongoDB URI resolved. Available relevant keys:", 
+        Object.keys(process.env).filter(k => k.includes('MONGO'))
+      );
+      throw new Error(`No MongoDB URI resolved for query. Target: ${options?.targetDatabase}`);
     }
 
     // 2. Get Client from Pool
@@ -248,6 +217,7 @@ export class MongoAdapter implements DatabaseAdapter {
     // 3. Query Collection
     // Assuming collection name == formId
     const collection = db.collection(formId);
+    console.log(`[MongoAdapter] Fetching from collection: [${formId}]`);
 
     const results = await collection
       .find({})
@@ -255,6 +225,7 @@ export class MongoAdapter implements DatabaseAdapter {
       .limit(options?.limit || 50)
       .toArray();
 
+    console.log(`[MongoAdapter] Query finished. Found ${results.length} documents.`);
     return results as unknown as PostPipeIngestPayload[];
   }
 

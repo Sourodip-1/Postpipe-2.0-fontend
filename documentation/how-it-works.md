@@ -34,7 +34,9 @@ graph LR
 1.  **No Direct Access**: PostPipe servers **never** touch your database directly. We don't want your IP whitelisting.
 2.  **The Connector**: You run a lightweight Node.js server (the "Connector") on your own infrastructure (Vercel, Railway, EC2).
 3.  **The Tunnel**: This connector listens for cryptographically signed requests from PostPipe, executes the query on _your_ local network/VPC, and returns the result.
-4.  **Security**: You control the extensive "Allow/Block" lists in your connector code.
+4.  **Security**: Every request is verified using SHA-256 HMAC signatures (`X-PostPipe-Signature`).
+5.  **Smart Resolution**: The connector automatically detects if a request is for **MongoDB** or **PostgreSQL** based on the form configuration or naming conventions.
+6.  **Cross-Database Routing**: Using target database IDs (e.g., `marketing`), the connector can route data to different physical databases by mapping to environment variable suffixes (e.g., `MONGODB_URI_MARKETING`).
 
 **Why use this?**
 
@@ -75,4 +77,5 @@ npx create-postpipe-app my-startup
 | **Best For**   | Existing Databases        | New Projects          |
 | **Deployment** | You deploy a small server | You deploy a full app |
 | **Data Flow**  | Tunneling (Proxy)         | Direct App-to-DB      |
+| **DB Support** | Mongo / Postgres / Neon   | Framework-dependent   |
 | **Philosophy** | "Connect to what exists"  | "Build what's next"   |

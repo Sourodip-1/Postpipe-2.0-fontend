@@ -7,7 +7,8 @@ export async function addDatabaseAction(
     connectorId: string,
     alias: string,
     uri: string,
-    dbName: string
+    dbName: string,
+    type: 'mongodb' | 'postgres' = 'mongodb'
 ) {
     try {
         const session = await getSession();
@@ -44,7 +45,8 @@ export async function addDatabaseAction(
                 $set: {
                     [`connectors.$.databases.${safeAlias}`]: {
                         uri: uri,
-                        dbName: dbName
+                        dbName: dbName,
+                        type: type
                     }
                 }
             }

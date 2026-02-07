@@ -6,6 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import SubmissionsClient from '@/components/dashboard/submissions-client';
 import { getForm, getConnector, getUserDatabaseConfig } from '@/lib/server-db';
+import { ensureFullUrl } from '@/lib/utils';
 import { getSession } from '@/lib/auth/actions';
 
 export const metadata: Metadata = {
@@ -37,30 +38,27 @@ export default async function SubmissionsPage({ params }: { params: { id: string
     // 1. Resolve Database Config (to support dynamic routing)
     let databaseConfig = null;
 
-    // STRATEGY: Fetch from User Database Config (MongoDB)
+    // STRATEGY: Fetch from User Database Config (MongoDB) OR Connector-level Config
     try {
-        // We need getUserDatabaseConfig helper
-        // Since this is a server component, we can call server-db directly
-        // But we need the userId. 'form' object has userId.
+        const target = form.targetDatabase || "default";
+
+        // 1. Check Global User Config
         if (form.userId) {
             const userConfig = await getUserDatabaseConfig(form.userId);
-            console.log(`[Dashboard] Fetched user config for target: '${form.targetDatabase}'`);
-
-            if (userConfig && userConfig.databases) {
-                // The UI stores it in 'databases' object keyed by the target name alias
-                const target = form.targetDatabase || userConfig.defaultTarget || "default";
-                const route = userConfig.databases[target];
-
-                if (route) {
-                    // The UI structure: { uri: "MONGODB_URI_...", dbName: "postpipe-2" }
-                    // The Connector expects: { uri: "MONGODB_URI_...", dbName: "postpipe-2" }
-                    // It matches perfectly!
-                    databaseConfig = route;
-                    console.log(`[Dashboard] Resolved config from DB: `, databaseConfig);
-                } else {
-                    console.warn(`[Dashboard] Target '${target}' not found in user config.`);
-                }
+            if (userConfig && userConfig.databases && userConfig.databases[target]) {
+                databaseConfig = userConfig.databases[target];
+                console.log(`[Dashboard] Resolved target '${target}' from User Config.`);
             }
+        }
+
+        // 2. Fallback: Check Connector-level Config (Many users save targets here)
+        if (!databaseConfig && connector.databases && connector.databases[target]) {
+            databaseConfig = connector.databases[target];
+            console.log(`[Dashboard] Resolved target '${target}' from Connector Config:`, databaseConfig);
+        }
+
+        if (!databaseConfig) {
+            console.warn(`[Dashboard] Target '${target}' not found in either User or Connector config.`);
         }
     } catch (e) {
         console.error("[Dashboard] Error fetching user config:", e);
@@ -105,11 +103,11 @@ export default async function SubmissionsPage({ params }: { params: { id: string
                     databaseConfig: JSON.stringify(databaseConfig || {})
                 });
 
-                const fetchUrl = `${connector.url}/postpipe/data?${queryParams.toString()}`;
+                const fetchUrl = `${ensureFullUrl(connector.url)}/postpipe/data?${queryParams.toString()}`;
 
                 const res = await fetch(fetchUrl, {
                     headers: {
-                        Authorization: `Bearer ${connector.secret} `
+                        Authorization: `Bearer ${connector.secret}`
                     },
                     cache: 'no-store',
                     next: { revalidate: 0 }
@@ -153,7 +151,7 @@ export default async function SubmissionsPage({ params }: { params: { id: string
             }
         } catch (e) {
             console.error("[Dashboard] Connector fetch error (Retries exhausted):", e);
-            fetchError = "Failed to connect to Connector. Please check if it is running.";
+            fetchError = `Failed to connect to Connector at ${connector.url}. Error: ${String(e)}`;
         }
     }
 

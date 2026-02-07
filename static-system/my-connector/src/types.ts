@@ -15,7 +15,7 @@ export interface ConnectorResponse {
 }
 
 export interface DatabaseAdapter {
-  connect(): Promise<void>;
+  connect(context?: any): Promise<void>;
   insert(submission: PostPipeIngestPayload): Promise<void>;
   query(formId: string, options?: any): Promise<PostPipeIngestPayload[]>;
   disconnect?(): Promise<void>;
@@ -25,4 +25,13 @@ export interface ConnectorConfig {
   connectorId: string;
   connectorSecret: string;
   port: number;
+}
+
+// Extend Express Request to include rawBody
+declare global {
+  namespace Express {
+    interface Request {
+      rawBody?: Buffer;
+    }
+  }
 }

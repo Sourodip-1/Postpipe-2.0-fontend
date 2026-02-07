@@ -24,59 +24,82 @@ Head over to the **[Static Connector Dashboard](https://www.postpipe.in/static)*
 1.  **Name It**: Enter a cool name, e.g., `my-production-db`.
 2.  **Fork It**: Click the **Fork Template** button to copy the connector code to your GitHub.
 3.  **Deploy It**: Use **Vercel**, **Railway**, or **Azure** to deploy your new repo.
-4.  **Config It**: In your deployment's "Environment Variables" settings, paste these:
-    - `POSTPIPE_CONNECTOR_ID` (From Dashboard)
-    - `POSTPIPE_CONNECTOR_SECRET` (From Dashboard)
-    - `DB_TYPE` (e.g., `mongodb`)
-    - `MONGODB_URI` (Your actual database connection string)
+4.  **Config It**: In your deployment's dashboard (e.g., Vercel), navigate to **Environment Variables** and paste your credentials.
+5.  **Install Command**: Ensure your build settings use `npm install` as the install command (Vercel usually detects this automatically).
 
-> [!NOTE] > **Using Multiple Databases?**  
-> No problem! Just add more env vars like `MONGODB_URI_MAIN`, `MONGODB_URI_ANALYTICS`, etc.
-> Then, map them in the [Database Dashboard](https://www.postpipe.in/dashboard/database) using the same variable names.
+### 🗄️ Database Setup
 
-### Option B: The "Hacker" Way (CLI)
+Depending on your database, set these variables in your environment:
 
-Prefer the terminal? We got you.
+#### **MongoDB**
+
+- `MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/dbname`
+
+#### **PostgreSQL / Supabase / Neon**
+
+- `POSTGRES_URL=postgres://user:pass@host:5432/dbname` (or `DATABASE_URL`)
+
+---
+
+## 🛠️ Advanced Configuration
+
+### 🌐 Multi-Database Routing
+
+You can connect multiple databases to a single connector.
+
+1. In the **Form Builder**, add a **Target Database ID** (e.g., `marketing`).
+2. Add a corresponding environment variable: `MONGODB_URI_MARKETING` (all uppercase suffix).
+3. The connector will automatically route submissions to the correct DB.
+
+### 🧠 Smart Resolution
+
+PostPipe 2.0 automatically resolves the database type per-form. If you name your target database something like `production-pg` or `neon-db`, the connector will intelligently use the PostgreSQL adapter even if your default `DB_TYPE` is set to `mongodb`.
+
+### 🔒 Env Var Prefixing
+
+If you have conflicting variable names in your hosting provider, set `POSTPIPE_VAR_PREFIX=MYAPP`. The connector will then look for `MYAPP_POSTPIPE_CONNECTOR_ID`, etc.
+
+---
+
+## 📡 Local Data Fetching (Bypassing SaaS)
+
+Your connector acts as its own API. You can fetch submissions directly from your own infrastructure:
+
+**Endpoint**: `GET /api/postpipe/forms/:formId/submissions`  
+**Query Params**:
+
+- `limit`: Number of records (default 50)
+- `dbType`: `mongodb` or `postgres` (optional)
+
+Example:
 
 ```bash
-# Scaffold your agent
-npx create-postpipe-connector my-agent
-
-# Enter the void
-cd my-agent
-
-# Install dependencies
-npm install
+curl http://your-connector.vercel.app/api/postpipe/forms/form_123/submissions?limit=10
 ```
 
 ---
 
 ## 📝 Step 2: Create a Form
 
-Now that we are connected, let's create a destination for your data.
-
-1.  Log in to [PostPipe Dashboard](https://postpipe.in).
-2.  Navigate to **[Forms](https://www.postpipe.in/dashboard/forms) → New Form**.
-3.  Fill in the details and hit **Save**.
+1. Log in to [PostPipe Dashboard](https://postpipe.in).
+2. Navigate to **[Forms](https://www.postpipe.in/dashboard/forms) → New Form**.
+3. Fill in the details and hit **Save**.
 
 ---
 
 ## 🧪 Step 3: Test the Flow
 
-Time to see the magic happen! ✨
-
-1.  Copy the **HTML/React code snippet** provided by your new Form.
-2.  Paste it into your local project.
-3.  **Save & Run**. Submit some test data.
+1. Copy the **HTML/React code snippet** provided by your new Form.
+2. Paste it into your local project.
+3. Submit test data and watch it appear in your DB!
 
 > [!IMPORTANT] > **Check Your Firewall!**  
-> Ensure your database allows incoming connections from your deployed connector (or all IPs `0.0.0.0/0` if you're testing).
+> Ensure your database allows incoming connections from your deployed connector's IP or whitelist `0.0.0.0/0` for testing.
 
 ---
 
-## 🎉 DONE!
+## 🎉 NEXT STEPS
 
-**Success!** Your data is now securely flowing into your database via PostPipe.
-
-> [!SUCCESS]
-> You have successfully bridged the gap between your frontend and your backend database. High five! ✋
+- [ ] [Learn about CLI Components](/docs/guides/cli-components)
+- [ ] [View Architecture Details](/docs/architecture)
+- [ ] [Join our Discord](https://discord.gg/postpipe)
