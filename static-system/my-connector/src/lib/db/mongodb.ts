@@ -113,10 +113,10 @@ export class MongoAdapter implements DatabaseAdapter {
 
     // 4. Fallback: Scan process.env for ANY MONGODB_URI_* (Last Resort)
     console.log(`[MongoAdapter] -> Searching fallback keys...`);
-    const fallbackKeys = Object.keys(process.env).filter(k => 
+    const fallbackKeys = Object.keys(process.env).filter(k =>
       k.startsWith('MONGODB_URI_') && process.env[k]
     );
-    
+
     if (fallbackKeys.length > 0) {
       const fallbackKey = fallbackKeys[0];
       console.log(`[MongoAdapter] -> Fallback match: ${fallbackKey}`);
@@ -132,7 +132,7 @@ export class MongoAdapter implements DatabaseAdapter {
 
     console.log(`[MongoAdapter] Resolving config for target: '${targetName}'`);
     const uri = this.resolveUri(targetName, databaseConfig) || "";
-    
+
     // Default dbName resolution
     let dbName = this.defaultDbName;
     if (databaseConfig?.dbName) {
@@ -150,7 +150,7 @@ export class MongoAdapter implements DatabaseAdapter {
       return connectionPool.get(uri)!;
     }
 
-    console.log(`[MongoAdapter] Establishing connection to host: ${uri.split('@').pop() || 'localhost'}`); 
+    console.log(`[MongoAdapter] Establishing connection to host: ${uri.split('@').pop() || 'localhost'}`);
 
     // Create promise and store it immediately
     const clientPromise = new MongoClient(uri).connect().then(client => {
@@ -188,9 +188,17 @@ export class MongoAdapter implements DatabaseAdapter {
     // 3. Determine Collection (Dynamic logic from previous task via payload)
     const targetCollection = payload.formName || payload.formId || this.collectionName;
 
-    // 4. Insert
+    // 4. Sanitize Payload (Remove sensitive config)
+    // We create a clean copy to avoid mutating the original payload if it's used elsewhere
+    const { databaseConfig, ...safePayload } = payload as any;
+
+    // Also remove targetDatabase if present as it's internal routing info
+    delete safePayload.targetDatabase;
+    delete safePayload.targetDb;
+
+    // 5. Insert
     await db.collection(targetCollection).insertOne({
-      ...payload,
+      ...safePayload,
       _receivedAt: new Date()
     });
 
@@ -198,13 +206,13 @@ export class MongoAdapter implements DatabaseAdapter {
   }
 
   async query(formId: string, options?: any): Promise<PostPipeIngestPayload[]> {
-    const { uri: targetUri, dbName: targetDbName } = this.getTargetConfig({ 
-      targetDatabase: options?.targetDatabase, 
-      databaseConfig: options?.databaseConfig 
+    const { uri: targetUri, dbName: targetDbName } = this.getTargetConfig({
+      targetDatabase: options?.targetDatabase,
+      databaseConfig: options?.databaseConfig
     } as any);
 
     if (!targetUri) {
-      console.error("[MongoAdapter] CRITICAL: No MongoDB URI resolved. Available relevant keys:", 
+      console.error("[MongoAdapter] CRITICAL: No MongoDB URI resolved. Available relevant keys:",
         Object.keys(process.env).filter(k => k.includes('MONGO'))
       );
       throw new Error(`No MongoDB URI resolved for query. Target: ${options?.targetDatabase}`);
