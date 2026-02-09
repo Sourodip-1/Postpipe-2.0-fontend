@@ -108,45 +108,52 @@ export function ExploreModal({ open, onOpenChange, item }: ExploreModalProps) {
                                     className="w-full max-w-[95vw] h-[90vh] overflow-hidden rounded-xl border bg-background shadow-lg sm:rounded-2xl md:w-full pointer-events-auto flex flex-col relative"
                                 >
                                     {/* Header */}
-                                    <div className="flex items-center justify-between border-b p-4 bg-background/50 backdrop-blur-md sticky top-0 z-10">
-                                        <div className="flex items-center gap-3">
+                                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between border-b p-4 bg-background/50 backdrop-blur-md sticky top-0 z-10 gap-4 md:gap-0">
+                                        <div className="flex items-center gap-3 w-full md:w-auto">
                                             <Avatar className="h-10 w-10 flex items-center justify-center rounded-lg border">
                                                 <AvatarImage src={item.author.avatar} alt={item.title} className="object-cover" />
                                                 <AvatarFallback className="rounded-lg bg-muted text-lg font-bold">
                                                     {item.title.substring(0, 2)}
                                                 </AvatarFallback>
                                             </Avatar>
-                                            <div>
+                                            <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2">
-                                                    <Dialog.Title className="text-lg font-semibold leading-none">{item.title}</Dialog.Title>
+                                                    <Dialog.Title className="text-lg font-semibold leading-none truncate">{item.title}</Dialog.Title>
                                                 </div>
-                                                <div className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                                                <div className="text-sm text-muted-foreground flex items-center gap-1 mt-1 truncate">
                                                     <span>{item.author.name}</span>
                                                     {/* Publisher (mocked for now) */}
                                                 </div>
                                             </div>
+                                            {/* Mobile Close Button */}
+                                            <Dialog.Close asChild className="md:hidden ml-auto">
+                                                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
+                                                    <X className="h-4 w-4" />
+                                                    <span className="sr-only">Close</span>
+                                                </Button>
+                                            </Dialog.Close>
                                         </div>
 
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
                                             {/* Toolbar Actions */}
-                                            <div className="flex items-center gap-2 mr-2">
+                                            <div className="flex items-center gap-2 mr-0 md:mr-2">
                                                 {item.cli && (
-                                                    <Button variant="outline" size="sm" className="h-9 gap-2" onClick={() => handleCopy(item.cli, "CLI command")}>
-                                                        <Terminal className="h-4 w-4" />
-                                                        <span className="font-medium text-xs">Copy CLI</span>
+                                                    <Button variant="outline" size="sm" className="h-9 gap-2 flex-1 md:flex-none" onClick={() => handleCopy(item.cli, "CLI command")}>
+                                                        <Terminal className="h-4 w-4 shrink-0" />
+                                                        <span className="font-medium text-xs whitespace-nowrap">Copy CLI</span>
                                                     </Button>
                                                 )}
                                                 {item.npmPackageUrl && (
-                                                    <Button variant="outline" size="sm" className="h-9 gap-2" onClick={handleOpenPackage}>
-                                                        <ExternalLink className="h-4 w-4" />
-                                                        <span className="font-medium text-xs">Open Package</span>
+                                                    <Button variant="outline" size="sm" className="h-9 gap-2 flex-1 md:flex-none" onClick={handleOpenPackage}>
+                                                        <ExternalLink className="h-4 w-4 shrink-0" />
+                                                        <span className="font-medium text-xs whitespace-nowrap">Open Package</span>
                                                     </Button>
                                                 )}
                                             </div>
 
-                                            <div className="h-6 w-px bg-border mx-2" />
+                                            <div className="hidden md:block h-6 w-px bg-border mx-2" />
 
-                                            <div className="w-[180px]">
+                                            <div className="w-full md:w-[180px]">
                                                 <Select
                                                     value={selectedDb}
                                                     onValueChange={(val) => {
@@ -160,8 +167,8 @@ export function ExploreModal({ open, onOpenChange, item }: ExploreModalProps) {
                                                         }
                                                     }}
                                                 >
-                                                    <SelectTrigger className="h-9 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 border-none">
-                                                        <div className="flex items-center gap-2">
+                                                    <SelectTrigger className="h-9 w-full rounded-full bg-primary text-primary-foreground hover:bg-primary/90 border-none">
+                                                        <div className="flex items-center gap-2 truncate">
                                                             <SelectValue placeholder="Select Database" />
                                                         </div>
                                                     </SelectTrigger>
@@ -178,7 +185,7 @@ export function ExploreModal({ open, onOpenChange, item }: ExploreModalProps) {
                                                 </Select>
                                             </div>
 
-                                            <Dialog.Close asChild>
+                                            <Dialog.Close asChild className="hidden md:flex">
                                                 <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full ml-1">
                                                     <X className="h-4 w-4" />
                                                     <span className="sr-only">Close</span>

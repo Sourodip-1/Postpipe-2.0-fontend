@@ -130,8 +130,8 @@ export default function DashboardShell({
             </Sidebar>
 
             {/* Main Content Area */}
-            <div className="flex flex-1">
-                <div className="p-2 md:p-10 rounded-tl-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 flex flex-col gap-2 flex-1 w-full h-full overflow-y-auto">
+            <div className="flex flex-1 overflow-hidden">
+                <div className="p-2 pt-20 md:p-10 md:pt-10 md:rounded-tl-2xl md:border border-neutral-200 dark:border-neutral-700 md:bg-white md:dark:bg-neutral-900 flex flex-col gap-2 flex-1 w-full h-full overflow-y-auto overflow-x-hidden">
                     {children}
                 </div>
             </div>

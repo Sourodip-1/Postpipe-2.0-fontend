@@ -137,9 +137,9 @@ export default function DatabasePage() {
                                     </div>
                                     <div>
                                         <CardTitle className="text-xl">{connector.name}</CardTitle>
-                                        <CardDescription className="flex items-center gap-2 mt-1">
+                                        <CardDescription className="flex flex-wrap items-center gap-2 mt-1">
                                             <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">{connector.id}</span>
-                                            <span className="text-xs text-muted-foreground truncate max-w-[300px]">{connector.url}</span>
+                                            <span className="text-xs text-muted-foreground truncate max-w-[200px] md:max-w-[300px]">{connector.url}</span>
                                         </CardDescription>
                                     </div>
                                     {connector.envPrefix && (

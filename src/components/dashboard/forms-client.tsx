@@ -169,16 +169,16 @@ ${form.fields.map((f: any) => `  <div>
     };
 
     return (
-        <div className="flex flex-col gap-8">
-            <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-8 min-w-0">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Static Forms</h1>
+                    <h1 className="text-xl md:text-3xl font-semibold md:font-bold tracking-tight">Static Forms</h1>
                     <p className="text-muted-foreground">
                         Manage your backendless forms and connections.
                     </p>
                 </div>
                 <Link href="/dashboard/forms/new">
-                    <RainbowButton className="h-9 px-4 text-xs text-white">
+                    <RainbowButton className="h-9 px-4 text-xs text-white w-full md:w-auto">
                         <Plus className="mr-2 h-3.5 w-3.5" />
                         <span className="whitespace-pre-wrap text-center font-medium leading-none tracking-tight">
                             New Form
@@ -187,8 +187,103 @@ ${form.fields.map((f: any) => `  <div>
                 </Link>
             </div>
 
-            <div className="rounded-md border">
-                <Table>
+            {/* Mobile Card View */}
+            <div className="grid grid-cols-1 gap-4 md:hidden">
+                {forms.map((form) => (
+                    <div key={form.id} className="rounded-lg border bg-card text-card-foreground shadow-sm p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                                <h3 className="font-semibold leading-none tracking-tight">{form.name}</h3>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <div className="flex items-center gap-1">
+                                        <div className="size-1.5 rounded-full bg-green-500" />
+                                        {form.connectorName}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className={cn("inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium", form.status === 'Live' ? "bg-green-500/10 text-green-500" : "bg-yellow-500/10 text-yellow-500")}>
+                                {form.status === 'Live' ? (
+                                    <span className="relative flex h-1.5 w-1.5 mr-1">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
+                                    </span>
+                                ) : (
+                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-yellow-500 mr-1"></span>
+                                )}
+                                {form.status}
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-between text-sm">
+                            <div className="flex flex-col">
+                                <span className="text-muted-foreground text-xs">Submissions</span>
+                                <span className="font-medium">{form.submissions.toLocaleString()}</span>
+                            </div>
+                            <div className="flex flex-col text-right">
+                                <span className="text-muted-foreground text-xs">Last Activity</span>
+                                <span className="font-medium">{form.lastSubmission}</span>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t">
+                            <Link href={`/dashboard/forms/${form.id}/edit`} className="flex-1">
+                                <Button variant="outline" size="sm" className="w-full">
+                                    <Edit className="mr-2 h-3.5 w-3.5" />
+                                    Edit
+                                </Button>
+                            </Link>
+
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm">
+                                        <MoreHorizontal className="h-3.5 w-3.5" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuLabel>Form Actions</DropdownMenuLabel>
+                                    <Link href={`/dashboard/forms/${form.id}/submissions`}>
+                                        <DropdownMenuItem>
+                                            <Eye className="mr-2 h-4 w-4" /> View Submissions
+                                        </DropdownMenuItem>
+                                    </Link>
+                                    <Link href={`/dashboard/forms/${form.id}/edit`}>
+                                        <DropdownMenuItem>
+                                            <Edit className="mr-2 h-4 w-4" /> Edit Form
+                                        </DropdownMenuItem>
+                                    </Link>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => copyEmbed(form.id)}>
+                                        <Code className="mr-2 h-4 w-4" /> Copy Embed HTML
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleDuplicate(form.id)}>
+                                        <CopyPlus className="mr-2 h-4 w-4" /> Duplicate Form
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => toggleStatus(form.id)}>
+                                        {form.status === 'Live' ? (
+                                            <>
+                                                <PauseCircle className="mr-2 h-4 w-4 text-orange-500" /> <span className="text-orange-500">Pause Form</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <PlayCircle className="mr-2 h-4 w-4 text-green-500" /> <span className="text-green-500">Resume Form</span>
+                                            </>
+                                        )}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => deleteForm(form.id)} className="text-destructive focus:text-destructive">
+                                        <Trash2 className="mr-2 h-4 w-4" /> Delete Form
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden md:block rounded-md border overflow-x-auto w-full">
+                <Table className="min-w-[800px]">
                     <TableHeader>
                         <TableRow>
                             <TableHead>Form Name</TableHead>

@@ -16,8 +16,8 @@ const resourceLinks = [
 
 export function AppFooter() {
     return (
-        <footer className="border-t bg-background">
-            <div className="container mx-auto px-4 py-16 md:py-24">
+        <footer className="border-t bg-background overflow-hidden relative">
+            <div className="w-full max-w-none px-4 md:px-12 py-16 md:py-24">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-16 md:mb-24">
                     <div>
                         <h3 className="text-xl md:text-2xl font-medium">Experience the Backend</h3>
@@ -53,7 +53,7 @@ export function AppFooter() {
                 <div className="text-center mb-16 md:mb-24">
                     <AnimatedWords
                         text="PostPiPe"
-                        className="font-headline text-8xl md:text-[12rem] lg:text-[15rem] font-bold tracking-tighter leading-none"
+                        className="font-headline text-[11vw] md:text-[12rem] lg:text-[15rem] font-bold tracking-tighter leading-none whitespace-nowrap overflow-visible"
                     />
                 </div>
             </div>

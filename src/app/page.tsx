@@ -56,7 +56,7 @@ export default function Home() {
     <>
       <section
         id="hero"
-        className="relative"
+        className="relative min-h-[calc(100vh-4rem)] flex flex-col justify-center px-4 md:px-6 lg:px-8"
       >
         <script
           type="application/ld+json"
@@ -96,7 +96,7 @@ export default function Home() {
               process from end to end.
             </p>
           </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-12 md:gap-4 lg:grid-cols-12 xl:max-h-[34rem] xl:grid-rows-2">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-12 md:gap-4 lg:grid-cols-12 xl:max-h-[34rem] xl:grid-rows-2">
             <GridItem
               area="md:[grid-area:1/1/2/7] xl:[grid-area:1/1/2/5]"
               icon={<Palette className="h-4 w-4 text-black dark:text-neutral-400" />}
@@ -208,7 +208,7 @@ interface GridItemProps {
 
 const GridItem = ({ area, icon, title, description }: GridItemProps) => {
   return (
-    <div className={cn("min-h-[14rem] list-none", area)}>
+    <div className={cn("min-h-[16rem] md:min-h-[14rem] list-none w-full", area)}>
       <div className="relative h-full rounded-[1.25rem] border-[0.75px] border-border p-2 md:rounded-[1.5rem] md:p-3">
         <GlowingEffect
           spread={40}

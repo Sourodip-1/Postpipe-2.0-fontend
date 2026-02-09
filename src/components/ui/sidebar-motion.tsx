@@ -3,6 +3,8 @@
 import { cn } from "@/lib/utils";
 import Link, { LinkProps } from "next/link";
 import React, { useState, createContext, useContext } from "react";
+import { createPortal } from "react-dom";
+import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { Menu, X } from "lucide-react";
 
@@ -110,20 +112,35 @@ export const MobileSidebar = ({
     ...props
 }: React.ComponentProps<"div">) => {
     const { open, setOpen } = useSidebar();
+    const [mounted, setMounted] = React.useState(false);
+    const [isMobile, setIsMobile] = React.useState(false);
+
+    React.useEffect(() => {
+        setMounted(true);
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
     return (
         <>
-            <div
-                className={cn(
-                    "h-10 px-4 py-4 flex flex-row md:hidden items-center justify-between bg-neutral-100 dark:bg-neutral-800 w-full"
-                )}
-                {...props}
-            >
-                <div className="flex justify-end z-20 w-full">
-                    <Menu
-                        className="text-neutral-800 dark:text-neutral-200 cursor-pointer"
-                        onClick={() => setOpen(!open)}
-                    />
-                </div>
+            {/* Premium Mobile Header Bar */}
+            {/* Sidebar Toggle - Positioned below Global Header */}
+            {mounted && isMobile && typeof document !== 'undefined' && createPortal(
+                <button
+                    className="fixed top-[70px] left-4 z-[9999] flex items-center gap-2 px-3 py-2 bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-medium rounded-full shadow-md active:scale-95 transition-all border border-neutral-700/20"
+                    onClick={() => setOpen(!open)}
+                    aria-label="Open dashboard menu"
+                >
+                    <Menu className="h-3.5 w-3.5" />
+                    <span>Dashboard</span>
+                </button>,
+                document.body
+            )}
+
+            {/* Overlay Portal */}
+            {mounted && isMobile && typeof document !== 'undefined' && createPortal(
                 <AnimatePresence>
                     {open && (
                         <motion.div
@@ -135,21 +152,23 @@ export const MobileSidebar = ({
                                 ease: "easeInOut",
                             }}
                             className={cn(
-                                "fixed h-full w-full inset-0 bg-white dark:bg-neutral-900 p-10 z-[100] flex flex-col justify-between",
+                                "fixed h-full w-full inset-0 bg-white dark:bg-neutral-900 p-10 z-[101] flex flex-col justify-between",
                                 className
                             )}
                         >
                             <div
-                                className="absolute right-10 top-10 z-50 text-neutral-800 dark:text-neutral-200 cursor-pointer"
-                                onClick={() => setOpen(!open)}
+                                className="absolute right-4 top-4 z-[102] text-neutral-800 dark:text-neutral-200 cursor-pointer p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                                onClick={() => setOpen(false)}
                             >
-                                <X />
+                                <X className="h-6 w-6" />
                             </div>
                             {children}
                         </motion.div>
                     )}
-                </AnimatePresence>
-            </div>
+                </AnimatePresence>,
+                document.body
+            )}
+
         </>
     );
 };
