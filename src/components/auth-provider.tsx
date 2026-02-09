@@ -75,14 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push("/login");
   }, [router]);
 
-  useEffect(() => {
-    // Clear JWT cache (session) every 2 minutes
-    const interval = setInterval(() => {
-      logout();
-    }, 2 * 60 * 1000);
 
-    return () => clearInterval(interval);
-  }, [logout]);
 
   // Function to manually refresh session (useful after profile update)
   const refreshSession = () => {
