@@ -73,6 +73,7 @@ export async function POST(
       data,
       targetDatabase: form.targetDatabase || "default",
       databaseConfig,
+      routing: form.routing, // Pass the routing config
       signature: "legacy_proxied"
     };
 

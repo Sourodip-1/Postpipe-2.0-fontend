@@ -14,6 +14,7 @@ export async function createFormAction(formData: FormData) {
     const connectorId = formData.get('connectorId') as string;
     const targetDatabase = formData.get('targetDatabase') as string;
     const fieldsJson = formData.get('fields') as string;
+    const routingJson = formData.get('routing') as string;
 
     if (!name || !connectorId) {
         return { error: 'Name and Connector are required' };
@@ -26,8 +27,17 @@ export async function createFormAction(formData: FormData) {
         return { error: 'Invalid fields data' };
     }
 
+    let routing = undefined;
+    if (routingJson) {
+        try {
+            routing = JSON.parse(routingJson);
+        } catch (e) {
+            console.warn("Invalid routing JSON", e);
+        }
+    }
+
     try {
-        const form = await createForm(connectorId, name, fields, session.userId, targetDatabase);
+        const form = await createForm(connectorId, name, fields, session.userId, targetDatabase, routing);
         return { success: true, formId: form.id };
     } catch (e) {
         return { error: 'Failed to create form' };
@@ -81,6 +91,7 @@ export async function updateFormAction(id: string, formData: FormData) {
     const connectorId = formData.get('connectorId') as string;
     const targetDatabase = formData.get('targetDatabase') as string;
     const fieldsJson = formData.get('fields') as string;
+    const routingJson = formData.get('routing') as string;
 
     if (!name || !connectorId) {
         return { error: 'Name and Connector are required' };
@@ -93,6 +104,15 @@ export async function updateFormAction(id: string, formData: FormData) {
         return { error: 'Invalid fields data' };
     }
 
+    let routing = undefined;
+    if (routingJson) {
+        try {
+            routing = JSON.parse(routingJson);
+        } catch (e) {
+            console.warn("Invalid routing JSON", e);
+        }
+    }
+
     const dbModule = await import('../../lib/server-db');
     const existingForm = await dbModule.getForm(id);
 
@@ -100,7 +120,7 @@ export async function updateFormAction(id: string, formData: FormData) {
     if (existingForm.userId !== session.userId) return { error: 'Unauthorized' };
 
     try {
-        await dbModule.updateForm(id, { name, connectorId, fields, targetDatabase });
+        await dbModule.updateForm(id, { name, connectorId, fields, targetDatabase, routing });
         return { success: true };
     } catch (e) {
         return { error: 'Failed to update form' };

@@ -39,11 +39,25 @@ export interface FormField {
   required: boolean;
 }
 
+export interface RoutingConfig {
+  broadcast: string[]; // List of databases to receive the full payload
+  splits: {
+    target: string;
+    fields: string[];
+    excludeFromMain?: boolean;
+  }[]; // Mappings for partial data routing
+  transformations?: {
+    mask: string[]; // Fields to mask (****-1234)
+    hash: string[]; // Fields to hash (SHA-256)
+  };
+}
+
 export interface Form {
   id: string; // Slug/ID e.g. "contact-us"
   name: string;
   connectorId: string;
   targetDatabase?: string; // e.g. "main", "backup"
+  routing?: RoutingConfig;
   fields: FormField[];
   createdAt: string;
   userId?: string; // The user who owns this form
@@ -195,7 +209,7 @@ export async function getConnectors(userId?: string): Promise<Connector[]> {
 
 
 // --- Forms ---
-export async function createForm(connectorId: string, name: string, fields: FormField[], userId?: string, targetDatabase?: string): Promise<Form> {
+export async function createForm(connectorId: string, name: string, fields: FormField[], userId?: string, targetDatabase?: string, routing?: RoutingConfig): Promise<Form> {
   const db = await getDB();
 
   if (!userId) {
@@ -216,6 +230,7 @@ export async function createForm(connectorId: string, name: string, fields: Form
     name,
     connectorId,
     targetDatabase,
+    routing,
     fields,
     createdAt: new Date().toISOString(),
     status: 'Live',

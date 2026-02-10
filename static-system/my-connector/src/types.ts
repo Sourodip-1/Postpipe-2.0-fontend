@@ -1,3 +1,16 @@
+export interface RoutingConfig {
+  broadcast: string[]; // List of databases to receive the full payload
+  splits: {
+    target: string;
+    fields: string[];
+    excludeFromMain?: boolean;
+  }[]; // Mappings for partial data routing
+  transformations?: {
+    mask: string[]; // Fields to mask (****-1234)
+    hash: string[]; // Fields to hash (SHA-256)
+  };
+}
+
 export interface PostPipeIngestPayload {
   formId: string;
   formName?: string;
@@ -6,6 +19,8 @@ export interface PostPipeIngestPayload {
   timestamp: string; // ISO-8601
   data: Record<string, unknown>;
   signature: string;
+  routing?: RoutingConfig;
+  databaseConfig?: any; // For dynamic configuration passed from frontend
 }
 
 export interface ConnectorResponse {

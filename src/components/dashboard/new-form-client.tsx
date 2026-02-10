@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, Trash2, Code, Save, GripVertical } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Code, Save, GripVertical, Clipboard, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -136,6 +136,22 @@ function SortableField({
     );
 }
 
+function CopyButton({ text }: { text: string }) {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    return (
+        <Button size="icon" variant="secondary" className="absolute top-2 right-2 h-6 w-6" onClick={handleCopy}>
+            {copied ? <Check className="h-3 w-3 text-green-500" /> : <Clipboard className="h-3 w-3" />}
+        </Button>
+    );
+}
+
 export default function NewFormClient({ onBack, initialData }: NewFormClientProps) {
     const [formName, setFormName] = useState(initialData?.name || "");
     const [connector, setConnector] = useState(initialData?.connectorId || "");
@@ -193,6 +209,13 @@ export default function NewFormClient({ onBack, initialData }: NewFormClientProp
         setFields(fields.map(f => f.id === id ? { ...f, [key]: value } : f));
     };
 
+    // Routing State
+    const [broadcastTargets, setBroadcastTargets] = useState<string[]>(initialData?.routing?.broadcast || []);
+    const [splits, setSplits] = useState<{ target: string; fields: string[]; excludeFromMain?: boolean }[]>(initialData?.routing?.splits || []);
+    const [maskedFields, setMaskedFields] = useState<string[]>(initialData?.routing?.transformations?.mask || []);
+    const [hashedFields, setHashedFields] = useState<string[]>(initialData?.routing?.transformations?.hash || []);
+    const [showRouting, setShowRouting] = useState(false);
+
     // Load connectors on mount
     const [connectors, setConnectors] = useState<any[]>([]);
     useEffect(() => {
@@ -200,6 +223,30 @@ export default function NewFormClient({ onBack, initialData }: NewFormClientProp
             setConnectors(data);
         });
     }, []);
+
+    const selectedConnectorData = connectors.find((c: any) => c.id === connector);
+    const availableDatabases = selectedConnectorData?.databases ? Object.keys(selectedConnectorData.databases) : [];
+
+    const toggleBroadcast = (dbName: string) => {
+        setBroadcastTargets(prev =>
+            prev.includes(dbName) ? prev.filter(t => t !== dbName) : [...prev, dbName]
+        );
+    };
+
+    const addSplit = () => {
+        setSplits([...splits, { target: "", fields: [] }]);
+    };
+
+    const updateSplit = (index: number, key: "target" | "fields" | "excludeFromMain", value: any) => {
+        const newSplits = [...splits];
+        // @ts-ignore
+        newSplits[index][key] = value;
+        setSplits(newSplits);
+    };
+
+    const removeSplit = (index: number) => {
+        setSplits(splits.filter((_, i) => i !== index));
+    };
 
     const handleSave = async () => {
         if (!formName || !connector) {
@@ -214,6 +261,17 @@ export default function NewFormClient({ onBack, initialData }: NewFormClientProp
         // Map fields to match simple structure expected by server
         const simplifiedFields = fields.map(f => ({ name: f.label, type: f.type, required: f.required }));
         formData.append('fields', JSON.stringify(simplifiedFields));
+
+        // Append Routing Config
+        const routing = {
+            broadcast: broadcastTargets,
+            splits: splits.filter(s => s.target && s.fields.length > 0),
+            transformations: {
+                mask: maskedFields,
+                hash: hashedFields
+            }
+        };
+        formData.append('routing', JSON.stringify(routing));
 
         try {
             let res;
@@ -286,9 +344,9 @@ ${fields.map(f => `      <div>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
                 {/* Left Column: Builder */}
-                <div className="lg:col-span-2 space-y-6">
+                <div className="lg:col-span-3 space-y-6">
                     <Card>
                         <CardHeader>
                             <CardTitle>Form Details</CardTitle>
@@ -312,20 +370,193 @@ ${fields.map(f => `      <div>
                                 </Select>
                             </div>
                             <div className="grid gap-2">
-                                <Label>Target Database</Label>
+                                <Label>Main Target Database</Label>
                                 <Select value={targetDb} onValueChange={setTargetDb}>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select target database..." />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="default">Default (default)</SelectItem>
-                                        {connector && connectors.find((c: any) => c.id === connector)?.databases && Object.keys(connectors.find((c: any) => c.id === connector)?.databases || {}).map((key: string) => (
+                                        {availableDatabases.map((key: string) => (
                                             <SelectItem key={key} value={key}>{key}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                                 <p className="text-xs text-muted-foreground">Select where submissions should be routed.</p>
                             </div>
+
+                            {/* Routing Configuration */}
+                            {connector && availableDatabases.length > 0 && (
+                                <div className="pt-4 border-t">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <Label className="text-base">Advanced Data Routing</Label>
+                                        <Switch checked={showRouting} onCheckedChange={setShowRouting} />
+                                    </div>
+
+                                    {showRouting && (
+                                        <div className="space-y-6 animate-in slide-in-from-top-2">
+                                            {/* Broadcast Section */}
+                                            <div className="space-y-3">
+                                                <Label className="text-sm font-semibold">Broadcast (Duplicate Data)</Label>
+                                                <p className="text-xs text-muted-foreground">Send exact copies of every submission to these additional databases.</p>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    {availableDatabases.map((db) => (
+                                                        <div key={db} className="flex items-center space-x-2 border p-2 rounded-md hover:bg-muted/50">
+                                                            <Switch
+                                                                id={`broadcast-${db}`}
+                                                                checked={broadcastTargets.includes(db)}
+                                                                onCheckedChange={() => toggleBroadcast(db)}
+                                                                disabled={db === targetDb}
+                                                            />
+                                                            <Label htmlFor={`broadcast-${db}`} className={db === targetDb ? "opacity-50" : ""}>
+                                                                {db} {db === targetDb && "(Main)"}
+                                                            </Label>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* BreakPoints Section */}
+                                            <div className="space-y-3">
+                                                <div className="flex items-center justify-between">
+                                                    <Label className="text-sm font-semibold">BreakPoints (Split Routing)</Label>
+                                                    <Button variant="ghost" size="sm" onClick={addSplit} className="h-6 gap-1">
+                                                        <Plus className="h-3 w-3" /> Add Rule
+                                                    </Button>
+                                                </div>
+                                                <p className="text-xs text-muted-foreground">Route specific fields to specific databases (e.g. Analytics data to Mongo).</p>
+
+                                                <div className="space-y-3">
+                                                    {splits.map((split, idx) => (
+                                                        <div key={idx} className="flex gap-2 items-start border p-3 rounded-md bg-muted/20 relative group">
+                                                            <div className="grid gap-2 flex-1">
+                                                                <div className="grid grid-cols-2 gap-2">
+                                                                    <div className="space-y-1">
+                                                                        <Label className="text-xs">Target DB</Label>
+                                                                        <Select value={split.target} onValueChange={(val) => updateSplit(idx, "target", val)}>
+                                                                            <SelectTrigger className="h-8 text-xs">
+                                                                                <SelectValue placeholder="Select DB" />
+                                                                            </SelectTrigger>
+                                                                            <SelectContent>
+                                                                                {availableDatabases.map(db => (
+                                                                                    <SelectItem key={db} value={db}>{db}</SelectItem>
+                                                                                ))}
+                                                                            </SelectContent>
+                                                                        </Select>
+                                                                    </div>
+                                                                    <div className="space-y-1">
+                                                                        <Label className="text-xs">Fields to Send</Label>
+                                                                        <Select
+                                                                            // Hacky multi-select simulation or just use simple select for now?
+                                                                            // Let's use a simpler approach: Comma separated text for now to save UI complexity
+                                                                            // Or, better, mapped checkboxes in a dropdown? Too complex for this snippet.
+                                                                            // Let's use a text input for field names for MVP.
+                                                                            value={split.fields.join(", ")}
+                                                                            disabled
+                                                                        >
+                                                                            <SelectTrigger className="h-8 text-xs">
+                                                                                <SelectValue placeholder="Select Fields" />
+                                                                            </SelectTrigger>
+                                                                        </Select>
+                                                                        {/* Actual Field Selection UI */}
+                                                                        <div className="flex flex-wrap gap-1 mt-1">
+                                                                            {fields.map(f => (
+                                                                                <div
+                                                                                    key={f.id}
+                                                                                    onClick={() => {
+                                                                                        const newFields = split.fields.includes(f.label)
+                                                                                            ? split.fields.filter(n => n !== f.label)
+                                                                                            : [...split.fields, f.label];
+                                                                                        updateSplit(idx, "fields", newFields);
+                                                                                    }}
+                                                                                    className={`cursor-pointer text-[10px] px-2 py-1 rounded-full border ${split.fields.includes(f.label) ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"}`}
+                                                                                >
+                                                                                    {f.label}
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="flex items-center space-x-2 pt-2 border-t border-dashed mt-2">
+                                                                    <Switch
+                                                                        id={`exclude-${idx}`}
+                                                                        checked={split.excludeFromMain || false}
+                                                                        onCheckedChange={(checked) => updateSplit(idx, "excludeFromMain", checked)}
+                                                                    />
+                                                                    <Label htmlFor={`exclude-${idx}`} className="text-[10px] text-muted-foreground font-normal">
+                                                                        Exclude these fields from Main Database?
+                                                                    </Label>
+                                                                </div>
+                                                            </div>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-6 w-6 absolute -top-2 -right-2 bg-background border shadow-sm rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                onClick={() => removeSplit(idx)}
+                                                            >
+                                                                <Trash2 className="h-3 w-3 text-destructive" />
+                                                            </Button>
+                                                        </div>
+                                                    ))}
+                                                    {splits.length === 0 && (
+                                                        <div className="text-xs text-muted-foreground text-center py-4 border border-dashed rounded-md">
+                                                            No routing rules defined.
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Data Transformation Section */}
+                                            <div className="space-y-3 pt-4 border-t">
+                                                <Label className="text-sm font-semibold">Data Transformation (Security)</Label>
+                                                <p className="text-xs text-muted-foreground">Apply security rules before data is stored.</p>
+
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div className="space-y-2">
+                                                        <Label className="text-xs font-medium">Masking (****-1234)</Label>
+                                                        <div className="flex flex-wrap gap-1 p-2 border rounded-md bg-muted/20 min-h-[40px]">
+                                                            {fields.map(f => (
+                                                                <div
+                                                                    key={`mask-${f.id}`}
+                                                                    onClick={() => {
+                                                                        setMaskedFields(prev =>
+                                                                            prev.includes(f.label) ? prev.filter(n => n !== f.label) : [...prev, f.label]
+                                                                        );
+                                                                    }}
+                                                                    className={`cursor-pointer text-[10px] px-2 py-1 rounded-full border ${maskedFields.includes(f.label) ? "bg-orange-100 text-orange-700 border-orange-200" : "bg-background hover:bg-muted"}`}
+                                                                >
+                                                                    {f.label}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                        <p className="text-[10px] text-muted-foreground">Best for: Phone numbers, Credit Cards, IDs.</p>
+                                                    </div>
+
+                                                    <div className="space-y-2">
+                                                        <Label className="text-xs font-medium">Hashing (SHA-256)</Label>
+                                                        <div className="flex flex-wrap gap-1 p-2 border rounded-md bg-muted/20 min-h-[40px]">
+                                                            {fields.map(f => (
+                                                                <div
+                                                                    key={`hash-${f.id}`}
+                                                                    onClick={() => {
+                                                                        setHashedFields(prev =>
+                                                                            prev.includes(f.label) ? prev.filter(n => n !== f.label) : [...prev, f.label]
+                                                                        );
+                                                                    }}
+                                                                    className={`cursor-pointer text-[10px] px-2 py-1 rounded-full border ${hashedFields.includes(f.label) ? "bg-blue-100 text-blue-700 border-blue-200" : "bg-background hover:bg-muted"}`}
+                                                                >
+                                                                    {f.label}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                        <p className="text-[10px] text-muted-foreground">Best for: Passwords, Secrets.</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
 
@@ -362,7 +593,7 @@ ${fields.map(f => `      <div>
                 </div>
 
                 {/* Right Column: Preview/Code */}
-                <div className="space-y-6">
+                <div className="lg:col-span-2 space-y-6">
                     <Card className="sticky top-6">
                         <CardHeader>
                             <CardTitle>Generated Embed</CardTitle>
@@ -382,9 +613,7 @@ ${fields.map(f => `      <div>
                                             <pre className="bg-muted p-4 rounded-md text-xs font-mono overflow-auto max-h-[400px]">
                                                 {embedCodeHTML}
                                             </pre>
-                                            <Button size="icon" variant="secondary" className="absolute top-2 right-2 h-6 w-6" onClick={() => navigator.clipboard.writeText(embedCodeHTML)}>
-                                                <Code className="h-3 w-3" />
-                                            </Button>
+                                            <CopyButton text={embedCodeHTML} />
                                         </div>
                                     </TabsContent>
                                     <TabsContent value="react">
@@ -392,9 +621,7 @@ ${fields.map(f => `      <div>
                                             <pre className="bg-muted p-4 rounded-md text-xs font-mono overflow-auto max-h-[400px]">
                                                 {embedCodeReact}
                                             </pre>
-                                            <Button size="icon" variant="secondary" className="absolute top-2 right-2 h-6 w-6" onClick={() => navigator.clipboard.writeText(embedCodeReact)}>
-                                                <Code className="h-3 w-3" />
-                                            </Button>
+                                            <CopyButton text={embedCodeReact} />
                                         </div>
                                     </TabsContent>
                                 </Tabs>
@@ -407,6 +634,6 @@ ${fields.map(f => `      <div>
                     </Card>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }

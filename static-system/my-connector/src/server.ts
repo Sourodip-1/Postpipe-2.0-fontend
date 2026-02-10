@@ -181,34 +181,152 @@ app.post('/postpipe/ingest', async (req: Request, res: Response) => {
         }
 
         // 4. Persistence
-        // SMART ADAPTER SELECTION
-        const payloadType = (payload as any).databaseConfig?.type;
-        const targetName = (payload as any).targetDatabase || payload.targetDb;
-        
-        let resolvedType = payloadType;
-        if (!resolvedType && targetName) {
-            const targetLower = String(targetName).toLowerCase();
-            if (targetLower.includes('postgres') || targetLower.includes('pg') || targetLower.includes('neon')) {
-                resolvedType = 'postgres';
-                console.log(`[Server] Smart Routing: Ingest target '${targetName}' suggests Postgres.`);
+        // SMART ADAPTER SELECTION & ROUTING
+        const routing = (payload as any).routing;
+
+        // --- Transformation Helper ---
+        const applyTransformations = (data: any, config: any) => {
+            if (!config || !data) return data;
+            const transformed = { ...data };
+
+            // Masking
+            if (config.mask && Array.isArray(config.mask)) {
+                config.mask.forEach((field: string) => {
+                    if (transformed[field]) {
+                        const val = String(transformed[field]);
+                        // Show last 4 chars, mask rest
+                        const visible = val.slice(-4);
+                        const masked = "*".repeat(Math.max(0, val.length - 4)) + visible;
+                        transformed[field] = masked;
+                    }
+                });
+            }
+
+            // Hashing
+            if (config.hash && Array.isArray(config.hash)) {
+                config.hash.forEach((field: string) => {
+                    if (transformed[field]) {
+                        // Simple SHA-256 hash
+                        const hash = nodeCrypto.createHash('sha256').update(String(transformed[field])).digest('hex');
+                        transformed[field] = hash;
+                    }
+                });
+            }
+
+            return transformed;
+        };
+
+        // Apply transformations globally to the base payload data first
+        if (routing && routing.transformations) {
+            payload.data = applyTransformations(payload.data, routing.transformations);
+            console.log("[Server] Applied Data Transformations (Masking/Hashing)");
+        }
+
+        // Helper to insert into a specific target
+        const insertToTarget = async (targetName: string, dataPayload: PostPipeIngestPayload) => {
+            const payloadType = (dataPayload as any).databaseConfig?.type;
+            let resolvedType = payloadType;
+
+            if (!resolvedType && targetName) {
+                const targetLower = String(targetName).toLowerCase();
+                if (targetLower.includes('postgres') || targetLower.includes('pg') || targetLower.includes('neon')) {
+                    resolvedType = 'postgres';
+                    console.log(`[Server] Smart Routing: Target '${targetName}' suggests Postgres.`);
+                }
+            }
+
+            const adapter = getAdapter(resolvedType);
+
+            if (resolvedType) {
+                console.log(`[Server] Using adapter: ${resolvedType} for target: ${targetName}`);
+            } else {
+                console.log(`[Server] Using default adapter: ${process.env.DB_TYPE || 'InMemory'} for target: ${targetName}`);
+            }
+
+            console.log(`[Server] Connecting to database for target: ${targetName}...`);
+            // Ensure connection (might need specific config per target if available in payload)
+            // For now, we assume the adapter handles connection based on global env or passed config
+            // If targetName is specific, we might need to look up its config if not in payload
+            await adapter.connect({ ...dataPayload, targetDatabase: targetName });
+
+            console.log(`[Server] Inserting payload into ${targetName}...`);
+            await adapter.insert({ ...dataPayload, targetDb: targetName });
+        };
+
+        const promises = [];
+
+        // A. Primary/Default Target
+        const primaryTarget = (payload as any).targetDatabase || payload.targetDb || "default";
+
+        // Calculate Exclusion for Primary Target
+        let primaryPayloadData = { ...payload.data };
+        let hasExclusions = false;
+
+        if (routing && routing.splits && Array.isArray(routing.splits)) {
+            routing.splits.forEach((split: any) => {
+                if (split.excludeFromMain && split.fields) {
+                    split.fields.forEach((field: string) => {
+                        delete primaryPayloadData[field];
+                        hasExclusions = true;
+                    });
+                }
+            });
+        }
+
+        const primaryPayload = hasExclusions
+            ? { ...payload, data: primaryPayloadData }
+            : payload;
+
+        if (hasExclusions) {
+            console.log(`[Server] Excluded fields from primary '${primaryTarget}' payload.`);
+        }
+
+        promises.push(insertToTarget(primaryTarget, primaryPayload));
+
+        // B. Broadcast Targets
+        if (routing && routing.broadcast && Array.isArray(routing.broadcast)) {
+            for (const target of routing.broadcast) {
+                if (target !== primaryTarget) {
+                    console.log(`[Server] Broadcasting to: ${target}`);
+                    const broadcastPayload = { ...payload, targetDb: target };
+                    // Remove primary config so we resolve adapter based on target name
+                    delete (broadcastPayload as any).databaseConfig;
+                    promises.push(insertToTarget(target, broadcastPayload));
+                }
             }
         }
 
-        const adapter = getAdapter(resolvedType);
-        
-        if (resolvedType) {
-            console.log(`[Server] Using adapter: ${resolvedType}`);
-        } else {
-            console.log(`[Server] Using default adapter: ${process.env.DB_TYPE || 'InMemory'}`);
+        // C. BreakPoint / Splits
+        if (routing && routing.splits && Array.isArray(routing.splits)) {
+            for (const split of routing.splits) {
+                console.log(`[Server] Processing Split for: ${split.target}`);
+
+                // Filter Data
+                const filteredData: Record<string, unknown> = {};
+                if (split.fields && Array.isArray(split.fields)) {
+                    split.fields.forEach((field: string) => {
+                        if (payload.data && Object.prototype.hasOwnProperty.call(payload.data, field)) {
+                            filteredData[field] = payload.data[field];
+                        }
+                    });
+                }
+
+                const partialPayload = {
+                    ...payload,
+                    data: filteredData,
+                    targetDb: split.target
+                };
+                // Remove primary config so we resolve adapter based on target name
+                delete (partialPayload as any).databaseConfig;
+
+                promises.push(insertToTarget(split.target, partialPayload));
+            }
         }
 
-        console.log("[Server] Connecting to database...");
-        await adapter.connect(payload);
-        console.log("[Server] Inserting payload...");
-        await adapter.insert(payload);
+        await Promise.all(promises);
 
         // Return Success
-        console.log("[Server] Success!");
+        console.log("[Server] Success! All targets processed.");
         return res.status(200).json({ status: 'ok', stored: true });
 
     } catch (error) {
@@ -246,7 +364,7 @@ app.get('/postpipe/data', authenticateConnector, async (req: Request, res: Respo
         // Extract from query or config
         const queryType = req.query.dbType as string;
         const configType = dbConfigParsed?.type;
-        
+
         let resolvedType = queryType || configType;
         if (!resolvedType && dbNameStr) {
             const targetLower = dbNameStr.toLowerCase();
@@ -308,8 +426,8 @@ app.get('/api/postpipe/forms/:formId/submissions', async (req: Request, res: Res
 // --- Diagnostic Catch-All ---
 app.use((req, res) => {
     console.warn(`[404] Route Not Found: ${req.method} ${req.originalUrl} from IP: ${req.ip}`);
-    res.status(404).json({ 
-        error: "Not Found", 
+    res.status(404).json({
+        error: "Not Found",
         message: `Route ${req.originalUrl} does not exist on this connector.`,
         availableRoutes: ["POST /postpipe/ingest", "GET /postpipe/data", "GET /api/postpipe/forms/:formId/submissions"]
     });
