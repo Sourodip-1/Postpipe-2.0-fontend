@@ -160,13 +160,13 @@ export default function OverviewClient({ forms, connectors, systems = [] }: Over
                         <div className="divide-y">
                             {recentForms.length > 0 ? recentForms.map((form, i) => (
                                 <div key={i} className="flex items-center justify-between p-4">
-                                    <div className="flex items-center gap-4">
-                                        <div className="rounded-full bg-blue-500/10 p-2">
+                                    <div className="flex items-center gap-4 min-w-0">
+                                        <div className="rounded-full bg-blue-500/10 p-2 flex-shrink-0">
                                             <FileText className="h-4 w-4 text-blue-500" />
                                         </div>
-                                        <div>
-                                            <p className="text-sm font-medium">{form.name}</p>
-                                            <p className="text-xs text-muted-foreground">ID: {form.id}</p>
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-medium truncate">{form.name}</p>
+                                            <p className="text-xs text-muted-foreground truncate">ID: {form.id}</p>
                                         </div>
                                     </div>
                                     <div className="text-xs text-muted-foreground">{new Date(form.createdAt).toLocaleDateString()}</div>

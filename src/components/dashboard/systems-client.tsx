@@ -73,7 +73,7 @@ export default function SystemsClient() {
 
     return (
         <div className="flex flex-col gap-8">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Backend Systems</h1>
                     <p className="text-muted-foreground">
@@ -81,7 +81,7 @@ export default function SystemsClient() {
                     </p>
                 </div>
                 <Link href="/explore">
-                    <RainbowButton className="h-9 px-4 text-xs text-white">
+                    <RainbowButton className="h-9 px-4 text-xs text-white w-full md:w-auto">
                         <Terminal className="mr-2 h-3.5 w-3.5" />
                         <span className="whitespace-pre-wrap text-center font-medium leading-none tracking-tight">
                             New System

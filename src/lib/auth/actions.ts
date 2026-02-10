@@ -295,10 +295,10 @@ export async function updateProfile(prevState: any, formData: FormData): Promise
         }
 
         await dbConnect();
-        
+
         const updateData: any = { name };
         if (image) {
-             updateData.image = image;
+            updateData.image = image;
         }
 
         const user = await User.findByIdAndUpdate(
@@ -310,7 +310,7 @@ export async function updateProfile(prevState: any, formData: FormData): Promise
         if (!user) {
             return { success: false, message: 'User not found' };
         }
-        
+
         return { success: true, message: 'Profile updated successfully' };
 
     } catch (error) {

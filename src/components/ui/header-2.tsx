@@ -27,7 +27,7 @@ export function Header2() {
 	const [isOpen, setIsOpen] = React.useState(false);
 
 	const links = [
-		{ href: "/explore", label: "Dynamic" },
+		{ href: "/explore", label: "Forge" },
 		{ href: "/static", label: "Static" },
 		{ href: "/dashboard/changelog", label: "Change Log" },
 		{ href: "/docs", label: "Docs" },

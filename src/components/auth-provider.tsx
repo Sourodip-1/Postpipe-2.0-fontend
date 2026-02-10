@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useState, useEffect } from "react";
+import React, { createContext, useState, useEffect, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { signOut } from "@/lib/auth/actions";
 
@@ -38,13 +38,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(data.user);
         } else {
           setUser(null);
+          document.cookie = `${AUTH_COOKIE_NAME}=; path=/; max-age=-1`;
         }
       } else {
         setUser(null);
+        document.cookie = `${AUTH_COOKIE_NAME}=; path=/; max-age=-1`;
       }
     } catch (error) {
       console.error("Failed to fetch user session", error);
       setUser(null);
+      // Only clear cookie on explicit auth failure, but error might include 401. 
+      // Safest to clear if we can't verify identity.
+      document.cookie = `${AUTH_COOKIE_NAME}=; path=/; max-age=-1`;
     } finally {
       setLoading(false);
     }
@@ -63,12 +68,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push("/dashboard");
   };
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     await signOut();
     document.cookie = `${AUTH_COOKIE_NAME}=; path=/; max-age=-1`;
     setUser(null);
     router.push("/login");
-  };
+  }, [router]);
+
+
 
   // Function to manually refresh session (useful after profile update)
   const refreshSession = () => {

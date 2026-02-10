@@ -28,8 +28,8 @@ export function SubmissionsTable() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="rounded-md border">
-          <Table>
+        <div className="rounded-md border overflow-x-auto w-full max-w-[85vw] md:max-w-full">
+          <Table className="min-w-[600px]">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[100px]">ID</TableHead>

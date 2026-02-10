@@ -159,7 +159,7 @@ export default function ConnectorsClient({ initialConnectors, databaseConfig }: 
 
     return (
         <div className="flex flex-col gap-8" >
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Connectors & Secrets</h1>
                     <p className="text-muted-foreground">
@@ -169,7 +169,7 @@ export default function ConnectorsClient({ initialConnectors, databaseConfig }: 
 
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                     <DialogTrigger asChild>
-                        <RainbowButton className="h-9 px-4 text-xs rounded-none text-white bg-[#181818]">
+                        <RainbowButton className="h-9 px-4 text-xs rounded-none text-white bg-[#181818] w-full md:w-auto">
                             <ShieldCheck className="mr-2 h-3.5 w-3.5" />
                             <span className="whitespace-pre-wrap text-center font-medium leading-none tracking-tight">New Connector</span>
                         </RainbowButton>
@@ -233,8 +233,8 @@ export default function ConnectorsClient({ initialConnectors, databaseConfig }: 
                 {connectors.map((connector) => (
                     <Card key={connector.id} className="overflow-hidden">
                         <CardHeader className="bg-muted/40">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-0">
+                                <div className="flex flex-wrap items-center gap-3">
                                     <CardTitle className="text-lg">{connector.name}</CardTitle>
                                     <Badge variant="outline" className={cn(
                                         "gap-1",
@@ -250,7 +250,7 @@ export default function ConnectorsClient({ initialConnectors, databaseConfig }: 
                                         </Badge>
                                     )}
                                 </div>
-                                <div className="text-sm text-muted-foreground">
+                                <div className="text-sm text-muted-foreground whitespace-nowrap">
                                     Last used: {connector.lastUsed}
                                 </div>
                             </div>

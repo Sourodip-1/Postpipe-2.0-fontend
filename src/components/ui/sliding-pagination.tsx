@@ -74,11 +74,11 @@ export default function SlidingPagination({
     const pagesToShow = generatePages()
 
     return (
-        <div className={cn("flex items-center gap-2", className)}>
+        <div className={cn("flex items-center gap-4", className)}>
             <Button
-                variant="ghost"
+                variant="outline"
                 size="icon"
-                className="h-8 w-8"
+                className="h-9 w-9 rounded-full border-neutral-200 dark:border-white/10 bg-white dark:bg-neutral-900 disabled:opacity-30 transition-all hover:bg-neutral-100 dark:hover:bg-white/10 shadow-sm hover:border-primary/20 hover:text-primary"
                 onClick={() => onPageChange(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
             >
@@ -86,27 +86,8 @@ export default function SlidingPagination({
                 <span className="sr-only">Previous Page</span>
             </Button>
 
-            <div className="relative inline-flex items-center gap-1">
-                {pagesToShow.map((pageNum, i) =>
-                    pageNum === -1 ? (
-                        <span key={`dots-${i}`} className="px-2 text-gray-400">…</span>
-                    ) : (
-                        <Button
-                            key={pageNum}
-                            variant="ghost"
-                            ref={(el) => { buttonRefs.current[pageNum - 1] = el; }}
-                            onClick={() => onPageChange(pageNum)}
-                            className={cn(
-                                "relative px-4 py-2 text-sm z-10 hover:bg-transparent",
-                                pageNum === currentPage ? "font-semibold text-primary" : "text-muted-foreground"
-                            )}
-                        >
-                            {pageNum}
-                        </Button>
-                    )
-                )}
-
-                {/* Sliding underline */}
+            <div className="relative inline-flex items-center p-1 rounded-full bg-neutral-100/80 dark:bg-neutral-900/50 border border-neutral-200 dark:border-white/5 hover:border-primary/20 transition-colors backdrop-blur-sm">
+                {/* Sliding Pill Background - Purple Brand Color */}
                 <motion.div
                     layout
                     initial={false}
@@ -114,15 +95,36 @@ export default function SlidingPagination({
                         left: underlineStyle.left,
                         width: underlineStyle.width,
                     }}
-                    transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                    className="absolute bottom-0 h-0.5 bg-primary rounded z-0"
+                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                    className="absolute top-1 bottom-1 bg-primary rounded-full shadow-lg shadow-primary/25 z-0"
                 />
+
+                {pagesToShow.map((pageNum, i) =>
+                    pageNum === -1 ? (
+                        <span key={`dots-${i}`} className="px-3 text-muted-foreground text-xs select-none">...</span>
+                    ) : (
+                        <Button
+                            key={pageNum}
+                            variant="ghost"
+                            ref={(el) => { buttonRefs.current[pageNum - 1] = el; }}
+                            onClick={() => onPageChange(pageNum)}
+                            className={cn(
+                                "relative h-8 min-w-[32px] px-3 rounded-full text-sm font-medium z-10 transition-colors hover:bg-transparent",
+                                pageNum === currentPage
+                                    ? "text-primary-foreground font-semibold"
+                                    : "text-muted-foreground hover:text-primary"
+                            )}
+                        >
+                            {pageNum}
+                        </Button>
+                    )
+                )}
             </div>
 
             <Button
-                variant="ghost"
+                variant="outline"
                 size="icon"
-                className="h-8 w-8"
+                className="h-9 w-9 rounded-full border-neutral-200 dark:border-white/10 bg-white dark:bg-neutral-900 disabled:opacity-30 transition-all hover:bg-neutral-100 dark:hover:bg-white/10 shadow-sm hover:border-primary/20 hover:text-primary"
                 onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
             >

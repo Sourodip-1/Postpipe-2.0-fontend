@@ -11,6 +11,8 @@ import {
     Home,
     Search,
 } from "lucide-react";
+import { usePathname, useSearchParams } from "next/navigation";
+
 import Link from "next/link";
 import { motion } from "framer-motion";
 import Image from "next/image";
@@ -25,67 +27,160 @@ interface ExploreSidebarProps {
 }
 
 export function ExploreSidebar({ open, setOpen }: ExploreSidebarProps) {
-    const [links, setLinks] = useState<any[]>([]);
+    const [links, setLinks] = useState<any[]>([
+        {
+            label: "Home",
+            href: "/explore",
+            icon: (
+                <Home className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
+            ),
+            group: "main"
+        },
+        {
+            label: "Search",
+            href: "#",
+            icon: (
+                <Search className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
+            ),
+            onClick: () => setSearchOpen(true),
+            group: "main"
+        },
+    ]);
     const [searchOpen, setSearchOpen] = useState(false);
     const { user } = useAuth();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
+
+    // Helper to check if a link is active
+    const isActive = (link: any) => {
+        if (link.href === "#") return false;
+
+        // Detailed check for query params
+        if (link.href.includes("?")) {
+            const [path, query] = link.href.split("?");
+            const params = new URLSearchParams(query);
+
+            // Check if all params match
+            let match = true;
+            params.forEach((value, key) => {
+                if (searchParams.get(key) !== value) match = false;
+            });
+
+            // Also ensure base path matches (usually /explore)
+            if (pathname !== path && path !== "") match = false;
+
+            return match;
+        }
+
+        // Exact match for paths without params
+        return pathname === link.href && searchParams.toString() === "";
+    };
 
     useEffect(() => {
         const fetchFilters = async () => {
-            const data = await getExploreFilters();
-            const newLinks = [
-                {
-                    label: "Home",
-                    href: "/explore",
-                    icon: (
-                        <Home className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
-                    ),
-                },
-                {
-                    label: "Search",
-                    href: "#",
-                    icon: (
-                        <Search className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
-                    ),
-                    onClick: () => setSearchOpen(true)
-                },
-                ...data.categories.map((cat) => ({
+            try {
+                const data = await getExploreFilters();
+                const categoryLinks = (data?.categories || []).map((cat: string) => ({
                     label: cat,
                     href: `?category=${encodeURIComponent(cat)}`,
                     icon: (
                         <Layers className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
                     ),
-                })),
-                ...data.tags.map((tag) => ({
+                    group: "category"
+                }));
+                const tagLinks = (data?.tags || []).map((tag: string) => ({
                     label: tag,
                     href: `?tag=${encodeURIComponent(tag)}`,
                     icon: (
                         <Tag className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
                     ),
-                })),
-            ];
-            setLinks(newLinks);
+                    group: "tag"
+                }));
+
+                setLinks(prevLinks => {
+                    const staticLinks = [
+                        {
+                            label: "Home",
+                            href: "/explore",
+                            icon: (
+                                <Home className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
+                            ),
+                            group: "main"
+                        },
+                        {
+                            label: "Search",
+                            href: "#",
+                            icon: (
+                                <Search className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
+                            ),
+                            onClick: () => setSearchOpen(true),
+                            group: "main"
+                        }
+                    ];
+                    return [...staticLinks, ...categoryLinks, ...tagLinks];
+                });
+            } catch (error) {
+                console.error("Failed to load sidebar filters", error);
+            }
         };
 
         fetchFilters();
     }, []);
 
+    // Custom Link Wrapper to handle active state styling
+    const RenderLink = ({ link }: { link: any }) => {
+        const active = isActive(link);
+        return (
+            <div onClick={link.onClick ? (e) => { e.preventDefault(); link.onClick(); } : undefined}>
+                <SidebarLink
+                    link={link}
+                    className={cn(
+                        "rounded-lg transition-all duration-200 group/link",
+                        open ? "px-3 py-2" : "px-0 py-2 justify-center",
+                        active
+                            ? "bg-neutral-100 dark:bg-primary/10 text-neutral-900 dark:text-primary font-medium"
+                            : "text-neutral-600 dark:text-muted-foreground hover:bg-neutral-100 dark:hover:bg-white/5 hover:text-neutral-900 dark:hover:text-foreground transparent"
+                    )}
+                />
+            </div>
+        );
+    };
+
     return (
         <>
             <Sidebar open={open} setOpen={setOpen}>
-                <SidebarBody className="justify-between gap-10 bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-700">
+                <SidebarBody className="justify-between gap-10 bg-white dark:bg-neutral-950 border-r border-neutral-200 dark:border-white/10">
                     <div className="flex flex-col flex-1 overflow-hidden relative">
-                        <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden pb-10">
+                        <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden pb-10 scrollbar-none">
                             {open ? <Logo /> : <LogoIcon />}
-                            <div className="mt-8 flex flex-col gap-2">
-                                {links.map((link, idx) => (
-                                    <div key={idx} onClick={link.onClick ? (e) => { e.preventDefault(); link.onClick(); } : undefined}>
-                                        <SidebarLink link={link} />
-                                    </div>
-                                ))}
+                            <div className="mt-8 flex flex-col gap-8">
+                                {/* Main Menu */}
+                                <div className="flex flex-col gap-1">
+                                    <h4 className={cn("text-[10px] font-bold text-neutral-500 dark:text-muted-foreground/40 mb-2 px-3 uppercase tracking-widest", !open && "hidden")}>Menu</h4>
+                                    {links.filter(l => l.group === 'main').map((link, idx) => (
+                                        <RenderLink key={idx} link={link} />
+                                    ))}
+                                </div>
+
+                                {/* Categories */}
+                                <div className={cn("flex flex-col gap-1", !open && "hidden")}>
+                                    <h4 className="text-[10px] font-bold text-neutral-500 dark:text-muted-foreground/40 mb-2 px-3 uppercase tracking-widest">Categories</h4>
+                                    {links.filter(l => l.group === 'category').map((link, idx) => (
+                                        <RenderLink key={idx} link={link} />
+                                    ))}
+                                </div>
+
+                                {/* Tags */}
+                                <div className={cn("flex flex-col gap-1", !open && "hidden")}>
+                                    <h4 className="text-[10px] font-bold text-neutral-500 dark:text-muted-foreground/40 mb-2 px-3 uppercase tracking-widest">Tags</h4>
+                                    {links.filter(l => l.group === 'tag').map((link, idx) => (
+                                        <RenderLink key={idx} link={link} />
+                                    ))}
+                                </div>
                             </div>
                         </div>
                         {/* Fade/Blur overlay */}
-                        <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-white dark:from-neutral-900 to-transparent pointer-events-none" />
+                        <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-white dark:from-neutral-950 to-transparent pointer-events-none" />
                     </div>
                     <div>
                         <SidebarLink
@@ -93,7 +188,7 @@ export function ExploreSidebar({ open, setOpen }: ExploreSidebarProps) {
                                 label: user?.name || "User",
                                 href: "/dashboard/profile",
                                 icon: (
-                                    <div className="h-7 w-7 relative flex-shrink-0 rounded-full overflow-hidden">
+                                    <div className="h-7 w-7 relative flex-shrink-0 rounded-full overflow-hidden border border-neutral-200 dark:border-white/10">
                                         <Image
                                             src={user?.image || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8YXZhdGFyfGVufDB8fDB8fHww&auto=format&fit=crop&w=800&q=60"}
                                             className="object-cover"
@@ -103,6 +198,7 @@ export function ExploreSidebar({ open, setOpen }: ExploreSidebarProps) {
                                     </div>
                                 ),
                             }}
+                            className="rounded-lg px-3 py-2 hover:bg-neutral-100 dark:hover:bg-white/5 transition-all duration-200 text-neutral-600 dark:text-neutral-200"
                         />
                     </div>
                 </SidebarBody>
@@ -131,7 +227,7 @@ export const LogoIcon = () => {
     return (
         <Link
             href="/explore"
-            className="font-normal flex space-x-2 items-center text-sm text-black py-1 relative z-20"
+            className="font-normal flex space-x-2 items-center justify-center text-sm text-black py-1 relative z-20"
         >
             <div className="relative h-6 w-6">
                 {/* PostPipe.ico might be a good small icon replacement, or keeping the svg but very small. 

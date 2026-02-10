@@ -13,7 +13,7 @@ export function AnimatedWords({ text, className }: AnimatedWordsProps) {
   const ref = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
     target: ref,
-    offset: ["start end", "end start"],
+    offset: ["start 90%", "end 90%"],
   });
 
   const letters = text.split("");
@@ -30,32 +30,32 @@ export function AnimatedWords({ text, className }: AnimatedWordsProps) {
           y = 0; // No vertical movement
         } else {
           // Staggered animation for each letter in "Pipe"
-          const start = 0.1 + (index - 4) * 0.08; 
+          const start = 0.1 + (index - 4) * 0.08;
           const end = 0.5 + (index - 4) * 0.1;
-          
+
           let yStart, yEnd;
-          
-          switch(index) {
+
+          switch (index) {
             case 4: // P
-              yStart = 80; yEnd = -10;
+              yStart = 20; yEnd = 0;
               break;
             case 5: // i
-              yStart = 60; yEnd = 10;
+              yStart = 15; yEnd = 0;
               break;
             case 6: // p
-              yStart = 60; yEnd = -20;
+              yStart = 15; yEnd = 0;
               break;
             case 7: // e
-              yStart = 70; yEnd = -80;
+              yStart = 18; yEnd = 0;
               break;
             default:
               yStart = 0; yEnd = 0;
           }
 
           y = useTransform(scrollYProgress, [start, end], [yStart, yEnd]);
-          opacity = useTransform(scrollYProgress, [start, end], [0.9, 1]);
+          opacity = useTransform(scrollYProgress, [start, end], [0, 1]);
         }
-        
+
         return (
           <motion.span
             key={index}
