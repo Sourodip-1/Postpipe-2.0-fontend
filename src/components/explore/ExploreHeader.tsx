@@ -26,7 +26,7 @@ export function ExploreHeader() {
                     </Tooltip>
 
                     <div className="hidden md:flex ml-2 font-medium text-sm text-foreground/80">
-                        Explore
+                        Forge
                     </div>
                 </div>
 
