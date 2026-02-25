@@ -126,19 +126,52 @@ export class MongoAdapter implements DatabaseAdapter {
     return undefined;
   }
 
+  private extractDbNameFromUri(uri: string): string | undefined {
+    try {
+      // mongodb://user:pass@host/dbname?options or mongodb+srv://...
+      const match = uri.match(/^mongodb(?:\+srv)?:\/\/[^/]+\/([^?#]+)/);
+      if (match) return match[1];
+    } catch (e) {}
+    return undefined;
+  }
+
   private getTargetConfig(payload?: PostPipeIngestPayload): { uri: string, dbName: string } {
     const { targetDatabase, databaseConfig } = (payload || {}) as any;
-    const targetName = targetDatabase || (payload as any)?.targetDb;
+    // CRITICAL: targetDb is usually the routed target (split/broadcast), prioritize it!
+    const targetName = (payload as any)?.targetDb || targetDatabase;
 
-    console.log(`[MongoAdapter] Resolving config for target: '${targetName}'`);
+    console.log(`[MongoAdapter] Resolving config for target: '${targetName || 'default'}'`);
     const uri = this.resolveUri(targetName, databaseConfig) || "";
 
-    // Default dbName resolution
+    // Optimized: Resolve DB Name with correct priority
     let dbName = this.defaultDbName;
+    
+    // Logic to determine if targetName is a real DB name or a technical alias/routing key
+    const thermalKeys = ['url', 'uri', 'mongodb', 'atlas', 'database'];
+    
+    const isRoutingKey = targetName && (
+      process.env[`MONGODB_URI_${targetName.toUpperCase()}`] ||
+      process.env[`DATABASE_URL_${targetName.toUpperCase()}`] ||
+      process.env[`POSTGRES_URL_${targetName.toUpperCase()}`]
+    );
+
+    const isInternalAlias = targetName && (
+      process.env[targetName] || 
+      thermalKeys.some(key => targetName.toLowerCase().includes(key)) ||
+      targetName === 'default'
+    );
+
+    const isTechnicalAlias = !!(isInternalAlias || isRoutingKey);
+
     if (databaseConfig?.dbName) {
       dbName = databaseConfig.dbName;
-    } else if (targetName) {
-      dbName = `postpipe_${targetName}`;
+    } else if (targetName && !isTechnicalAlias) {
+      dbName = targetName;
+    } else {
+      const extracted = uri ? this.extractDbNameFromUri(uri) : undefined;
+      if (extracted) {
+        dbName = extracted;
+      }
     }
 
     console.log(`[MongoAdapter] Resolved: DB=[${dbName}] URI=[${uri ? 'SET' : 'MISSING'}]`);
@@ -181,28 +214,33 @@ export class MongoAdapter implements DatabaseAdapter {
       throw new Error(`[MongoAdapter] No MongoDB URI resolved. Available relevant keys: ${Object.keys(process.env).filter(k => k.includes('MONGO'))}`);
     }
 
-    // 2. Get connection (cached)
+    // 1. Get connection (cached)
     const client = await this.getClient(uri);
     const db = client.db(dbName);
 
-    // 3. Determine Collection (Dynamic logic from previous task via payload)
+    // 2. Determine Collection (Dynamic logic via formName/formId)
     const targetCollection = payload.formName || payload.formId || this.collectionName;
 
-    // 4. Sanitize Payload (Remove sensitive config)
-    // We create a clean copy to avoid mutating the original payload if it's used elsewhere
-    const { databaseConfig, ...safePayload } = payload as any;
+    // 3. ARCHITECT LEVEL OPTIMIZATION: Payload Sanitization
+    // Strip ALL internal routing and configuration metadata
+    const { 
+      databaseConfig, 
+      routing, 
+      signature,
+      ...cleanData 
+    } = payload as any;
 
-    // Also remove targetDatabase if present as it's internal routing info
-    delete safePayload.targetDatabase;
-    delete safePayload.targetDb;
+    // Remove legacy/routing fields
+    delete cleanData.targetDatabase;
+    delete cleanData.targetDb;
 
-    // 5. Insert
+    // 4. Insert Sanitized Data
     await db.collection(targetCollection).insertOne({
-      ...safePayload,
+      ...cleanData,
       _receivedAt: new Date()
     });
 
-    console.log(`[MongoAdapter] Saved to DB [${dbName}] -> Collection [${targetCollection}]`);
+    console.log(`[MongoAdapter] Successfully routed to DB: [${dbName}] -> Collection: [${targetCollection}]`);
   }
 
   async query(formId: string, options?: any): Promise<PostPipeIngestPayload[]> {

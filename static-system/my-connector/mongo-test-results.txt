@@ -1,0 +1,32 @@
+--- MongoDB Config Test Results ---
+CASE: Technical alias as targetDb
+  Target: mongodb-uri
+  Expected DB: postpipe
+  Got DB:      postpipe
+  Result: PASSED
+
+CASE: Routed target is also technical
+  Target: postgres-url
+  Expected DB: postpipe
+  Got DB:      postpipe
+  Result: PASSED
+
+CASE: Custom target name used as DB name
+  Target: my_custom_mongo_db
+  Expected DB: my_custom_mongo_db
+  Got DB:      my_custom_mongo_db
+  Result: PASSED
+
+CASE: Explicit dbName in payload
+  Target: default
+  Expected DB: explicit_db
+  Got DB:      explicit_db
+  Result: PASSED
+
+CASE: URI priority: extract DB from resolved URI (ALT -> MONGODB_URI_ALT)
+  Target: ALT
+  Expected DB: alt_db
+  Got DB:      alt_db
+  Result: PASSED
+
+TOTAL: 5/5 Passed

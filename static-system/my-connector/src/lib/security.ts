@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 import { PostPipeIngestPayload } from '../types';
 
 /**
@@ -8,6 +9,7 @@ import { PostPipeIngestPayload } from '../types';
  * 1. HMAC-SHA256 Signature Verification
  * 2. Constant-time string comparison (to prevent timing attacks)
  * 3. Timestamp verification (to prevent replay attacks)
+ * 4. JWT Verification (Quick Auth)
  */
 
 const MAX_SKEW_SECONDS = 300; // 5 minutes allow skew
@@ -54,4 +56,12 @@ export function validatePayloadIds(payload: Partial<PostPipeIngestPayload>): boo
     return false;
   }
   return true;
+}
+
+export function verifyJwt(token: string, secret: string): any | null {
+  try {
+    return jwt.verify(token, secret);
+  } catch (e) {
+    return null;
+  }
 }

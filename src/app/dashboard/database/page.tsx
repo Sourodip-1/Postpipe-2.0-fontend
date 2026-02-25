@@ -15,6 +15,7 @@ type Connector = {
     id: string;
     name: string;
     url: string;
+    envPrefix?: string;
     databases?: Record<string, {
         uri: string;
         dbName: string;

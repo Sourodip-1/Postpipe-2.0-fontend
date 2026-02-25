@@ -1,6 +1,7 @@
 
 import express, { Request, Response } from 'express';
-import { verifySignature, validateTimestamp, validatePayloadIds } from './lib/security';
+import cookieParser from 'cookie-parser';
+import { verifySignature, validateTimestamp, validatePayloadIds, verifyJwt } from './lib/security';
 import { PostPipeIngestPayload } from './types';
 import { getAdapter } from './lib/db';
 import dotenv from 'dotenv';
@@ -80,6 +81,7 @@ function rateLimit(req: Request, res: Response, next: express.NextFunction) {
 }
 
 app.use(cors());
+app.use(cookieParser());
 
 // --- Body Parsing Middleware ---
 // IMPORTANT: We use a custom verify function to capture the raw body buffer
@@ -100,7 +102,7 @@ app.get('/', (req, res) => {
     res.json({
         status: 'ok',
         service: 'PostPipe Connector',
-        version: '1.0.0',
+        version: 'v2.1.0',
         config: {
             dbTypeDetected: process.env.DB_TYPE || 'InMemory',
             hasConnectorId: !!process.env.POSTPIPE_CONNECTOR_ID,
@@ -114,37 +116,43 @@ app.get('/', (req, res) => {
 // --- Core Authentication Middleware ---
 function authenticateConnector(req: Request, res: Response, next: express.NextFunction) {
     const authHeader = req.headers.authorization;
+    const authCookie = (req as any).cookies?.pp_auth_token;
 
-    if (!authHeader) {
-        console.warn(`[Auth] Missing Authorization Header from IP: ${req.ip}`);
-        return res.status(401).json({ error: "Unauthorized: Missing Header" });
+    // Support both Header and Cookie auth
+    let token = authCookie;
+    if (!token && authHeader) {
+        const match = authHeader.match(/^Bearer\s+(.+)$/i);
+        if (match) token = match[1];
     }
 
-    // Regex to robustly match "Bearer <token>"
-    const match = authHeader.match(/^Bearer\s+(.+)$/i);
-    if (!match) {
-        console.warn(`[Auth] Invalid Authorization Format from IP: ${req.ip}`);
-        return res.status(401).json({ error: "Unauthorized: Invalid Format" });
+    if (!token) {
+        console.warn(`[Auth] Missing Authorization from IP: ${req.ip}`);
+        return res.status(401).json({ error: "Unauthorized: Token missing" });
     }
 
-    const token = match[1];
+    // 1. Try JWT validation (Quick Auth)
+    const jwtPayload = verifyJwt(token, CONNECTOR_SECRET as string);
+    if (jwtPayload) {
+        (req as any).user = jwtPayload;
+        return next();
+    }
 
-    // Secure comparison
+    // 2. Fallback to Legacy Secret Comparison
     try {
         const tokenBuf = Buffer.from(token);
         const secretBuf = Buffer.from(CONNECTOR_SECRET as string);
 
-        if (tokenBuf.length !== secretBuf.length || !nodeCrypto.timingSafeEqual(tokenBuf, secretBuf)) {
-            console.warn(`[Auth] Invalid Token provided from IP: ${req.ip}`);
-            return res.status(403).json({ error: "Forbidden: Invalid Token" });
+        if (tokenBuf.length === secretBuf.length && nodeCrypto.timingSafeEqual(tokenBuf, secretBuf)) {
+            return next();
         }
     } catch (e) {
-        console.error("[Auth] Error during comparison", e);
-        return res.status(403).json({ error: "Forbidden" });
+        // Ignore binary buffer errors and proceed to fail
     }
 
-    next();
+    console.warn(`[Auth] Invalid Token provided from IP: ${req.ip}`);
+    return res.status(403).json({ error: "Forbidden: Invalid Token" });
 }
+
 // ----------------------------------------
 
 // @ts-ignore
@@ -232,6 +240,9 @@ app.post('/postpipe/ingest', async (req: Request, res: Response) => {
                 if (targetLower.includes('postgres') || targetLower.includes('pg') || targetLower.includes('neon')) {
                     resolvedType = 'postgres';
                     console.log(`[Server] Smart Routing: Target '${targetName}' suggests Postgres.`);
+                } else if (targetLower.includes('mongo') || targetLower.includes('mongodb') || targetLower.includes('atlas')) {
+                    resolvedType = 'mongodb';
+                    console.log(`[Server] Smart Routing: Target '${targetName}' suggests MongoDB.`);
                 }
             }
 
@@ -289,7 +300,8 @@ app.post('/postpipe/ingest', async (req: Request, res: Response) => {
                 if (target !== primaryTarget) {
                     console.log(`[Server] Broadcasting to: ${target}`);
                     const broadcastPayload = { ...payload, targetDb: target };
-                    // Remove primary config so we resolve adapter based on target name
+                    // Clean up primary target metadata to allow fresh resolution for bridged target
+                    delete (broadcastPayload as any).targetDatabase;
                     delete (broadcastPayload as any).databaseConfig;
                     promises.push(insertToTarget(target, broadcastPayload));
                 }
@@ -316,7 +328,8 @@ app.post('/postpipe/ingest', async (req: Request, res: Response) => {
                     data: filteredData,
                     targetDb: split.target
                 };
-                // Remove primary config so we resolve adapter based on target name
+                // Clean up primary target metadata to allow fresh resolution for bridged target
+                delete (partialPayload as any).targetDatabase;
                 delete (partialPayload as any).databaseConfig;
 
                 promises.push(insertToTarget(split.target, partialPayload));
@@ -371,6 +384,9 @@ app.get('/postpipe/data', authenticateConnector, async (req: Request, res: Respo
             if (targetLower.includes('postgres') || targetLower.includes('pg') || targetLower.includes('neon')) {
                 resolvedType = 'postgres';
                 console.log(`[Server] Smart Routing: Data target '${dbNameStr}' suggests Postgres.`);
+            } else if (targetLower.includes('mongo') || targetLower.includes('mongodb') || targetLower.includes('atlas')) {
+                resolvedType = 'mongodb';
+                console.log(`[Server] Smart Routing: Data target '${dbNameStr}' suggests MongoDB.`);
             }
         }
 
