@@ -294,45 +294,70 @@ app.post('/postpipe/ingest', async (req: Request, res: Response) => {
 
         promises.push(insertToTarget(primaryTarget, primaryPayload));
 
+        // Track fully covered targets so we don't send redundant breakpoint data
+        const fullyCoveredTargets = new Set<string>();
+        fullyCoveredTargets.add(primaryTarget);
+
         // B. Broadcast Targets
         if (routing && routing.broadcast && Array.isArray(routing.broadcast)) {
             for (const target of routing.broadcast) {
-                if (target !== primaryTarget) {
+                if (!fullyCoveredTargets.has(target)) {
                     console.log(`[Server] Broadcasting to: ${target}`);
                     const broadcastPayload = { ...payload, targetDb: target };
                     // Clean up primary target metadata to allow fresh resolution for bridged target
                     delete (broadcastPayload as any).targetDatabase;
                     delete (broadcastPayload as any).databaseConfig;
                     promises.push(insertToTarget(target, broadcastPayload));
+                    fullyCoveredTargets.add(target);
                 }
             }
         }
 
         // C. BreakPoint / Splits
         if (routing && routing.splits && Array.isArray(routing.splits)) {
-            for (const split of routing.splits) {
-                console.log(`[Server] Processing Split for: ${split.target}`);
+            // Group breakpoint logic by target to prevent inserting multiple fragments into the same DB
+            const groupedSplits = new Map<string, Record<string, unknown>>();
 
-                // Filter Data
-                const filteredData: Record<string, unknown> = {};
+            for (const split of routing.splits) {
+                // If this target is already receiving a FULL broadcast (or is primary), skip breakpoint logic entirely.
+                if (fullyCoveredTargets.has(split.target)) {
+                    console.log(`[Server] Skipping BreakPoint for ${split.target}: Target is already receiving full broadcast payload.`);
+                    continue;
+                }
+
+                console.log(`[Server] Processing BreakPoint Split for: ${split.target}`);
+
+                if (!groupedSplits.has(split.target)) {
+                    groupedSplits.set(split.target, {});
+                }
+
+                const currentGroupedData = groupedSplits.get(split.target)!;
+
                 if (split.fields && Array.isArray(split.fields)) {
                     split.fields.forEach((field: string) => {
                         if (payload.data && Object.prototype.hasOwnProperty.call(payload.data, field)) {
-                            filteredData[field] = payload.data[field];
+                            // Merge multiple breakpoint rules targeting the same DB
+                            currentGroupedData[field] = payload.data[field];
                         }
                     });
                 }
+            }
 
-                const partialPayload = {
-                    ...payload,
-                    data: filteredData,
-                    targetDb: split.target
-                };
-                // Clean up primary target metadata to allow fresh resolution for bridged target
-                delete (partialPayload as any).targetDatabase;
-                delete (partialPayload as any).databaseConfig;
+            // Execute inserts for grouped breakpoints
+            for (const [targetDb, mergedData] of groupedSplits.entries()) {
+                if (Object.keys(mergedData).length > 0) {
+                    const partialPayload = {
+                        ...payload,
+                        data: mergedData,
+                        targetDb: targetDb
+                    };
+                    
+                    // Clean up primary target metadata
+                    delete (partialPayload as any).targetDatabase;
+                    delete (partialPayload as any).databaseConfig;
 
-                promises.push(insertToTarget(split.target, partialPayload));
+                    promises.push(insertToTarget(targetDb, partialPayload));
+                }
             }
         }
 
