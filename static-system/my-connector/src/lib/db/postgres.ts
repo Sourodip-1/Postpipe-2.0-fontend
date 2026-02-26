@@ -4,6 +4,9 @@ import { DatabaseAdapter, PostPipeIngestPayload } from '../../types';
 // Map of Connection String -> Pool Promise (to handle race conditions)
 const postgresPoolMap = new Map<string, Promise<Pool>>();
 
+// Track initialized tables to prevent running CREATE TABLE IF NOT EXISTS on every query
+const initializedTables = new Set<string>();
+
 export class PostgresAdapter implements DatabaseAdapter {
 
     private resolveConnectionString(payload?: PostPipeIngestPayload): string | undefined {
@@ -41,72 +44,76 @@ export class PostgresAdapter implements DatabaseAdapter {
 
     /**
      * ARCHITECT OPTIMIZATION: Dynamic Database Override
-     * Replaces the database name in the connection string with the provided alias.
+     * In PostgreSQL, databases must exist before connecting. We cannot auto-create them 
+     * just by changing the URI string (it throws 3D000 Invalid Catalog Name). 
+     * We leave the connection untouched and use the alias for dynamic TABLE routing instead.
      */
     private overrideDatabaseInUri(uri: string, alias?: string): string {
-        if (!alias || alias === 'default' || alias.startsWith('conn_')) return uri;
-
-        // Skip if alias is actually an environment variable name or a technical key
-        const thermalKeys = ['url', 'uri', 'database', 'postgres', 'postgresql'];
-        const lowerAlias = alias.toLowerCase();
-        
-        if (process.env[alias] || 
-            thermalKeys.some(key => lowerAlias.includes(key))) {
-            return uri;
-        }
-
-        try {
-            // Very robust regex for postgres URIs: postgresql://user:pass@host:port/dbname?options
-            const match = uri.match(/^(postgresql?:\/\/[^/]+\/)([^?#]+)(\?.*)?$/);
-            if (match) {
-                const base = match[1];
-                const query = match[3] || "";
-                console.log(`[PostgresAdapter] Overriding database name in URI: [${match[2]}] -> [${alias}]`);
-                return `${base}${alias}${query}`;
-            }
-        } catch (e) {
-            console.warn("[PostgresAdapter] Failed to parse URI for override, using original.", e);
-        }
         return uri;
     }
 
-    private async getPool(connectionString: string, alias?: string): Promise<Pool> {
-        // Apply override if alias is provided
-        const finalUri = this.overrideDatabaseInUri(connectionString, alias);
+    private getTableName(alias?: string, dbName?: string): string {
+        const nameToUse = dbName || alias;
+        
+        const thermalKeys = ['url', 'uri', 'postgres', 'postgresql', 'database'];
+        const isTechnical = nameToUse && thermalKeys.some(key => nameToUse.toLowerCase().includes(key));
 
-        if (postgresPoolMap.has(finalUri)) {
-            return postgresPoolMap.get(finalUri)!;
+        if (!nameToUse || nameToUse === 'default' || nameToUse.startsWith('conn_') || isTechnical) {
+            return 'public.postpipe_submissions';
         }
-
-        const poolPromise = (async () => {
-            console.log(`[PostgresAdapter] Target Database: [${alias || 'default'}]`);
-            console.log(`[PostgresAdapter] Establishing connection pool to host: ${finalUri.split('@').pop()?.split('/')[0] || 'localhost'}`);
-
-            const pool = new Pool({
-                connectionString: finalUri,
-                ssl: (finalUri.includes('supabase') || 
-                      finalUri.includes('render') || 
-                      finalUri.includes('aiven') ||
-                      finalUri.includes('neon.tech'))
-                    ? { rejectUnauthorized: false } 
-                    : false
-            });
-
-            // Test connection
-            await pool.query('SELECT NOW()');
-            await this.ensureTable(pool);
-            return pool;
-        })();
-
-        postgresPoolMap.set(finalUri, poolPromise);
-        return poolPromise;
+        const safeAlias = nameToUse.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
+        return `public.${safeAlias}`;
     }
 
-    private async ensureTable(pool: Pool) {
+    private async getPool(connectionString: string, alias?: string, dbName?: string): Promise<Pool> {
+        // We do not override Postgres URI databases because it throws 3D000 if it doesn't exist
+        const finalUri = connectionString;
+
+        // Include alias in the cache key so different aliases don't return the same pool mapping mistakenly if URIs match
+        const cacheKey = `${finalUri}::${dbName || alias || 'default'}`;
+        
+        let poolPromise = postgresPoolMap.get(cacheKey);
+
+        if (!poolPromise) {
+            poolPromise = (async () => {
+                console.log(`[PostgresAdapter] Target Database: [${dbName || alias || 'default'}]`);
+                console.log(`[PostgresAdapter] Establishing connection pool to host: ${finalUri.split('@').pop()?.split('/')[0] || 'localhost'}`);
+
+                const pool = new Pool({
+                    connectionString: finalUri,
+                    ssl: (finalUri.includes('supabase') || 
+                          finalUri.includes('render') || 
+                          finalUri.includes('aiven') ||
+                          finalUri.includes('neon.tech'))
+                        ? { rejectUnauthorized: false } 
+                        : false
+                });
+
+                // Test connection
+                await pool.query('SELECT NOW()');
+                return pool;
+            })();
+
+            postgresPoolMap.set(cacheKey, poolPromise);
+        }
+
+        const pool = await poolPromise;
+        await this.ensureTable(pool, alias, dbName);
+        return pool;
+    }
+
+    private async ensureTable(pool: Pool, alias?: string, dbName?: string) {
+        const tableName = this.getTableName(alias, dbName);
+        
+        // Skip if we already initialized this specific table in this runtime
+        if (initializedTables.has(tableName)) {
+            return;
+        }
+
         try {
-            console.log("[PostgresAdapter] Verifying table 'public.postpipe_submissions' exists...");
+            console.log(`[PostgresAdapter] Verifying table '${tableName}' exists...`);
             const createTableQuery = `
-                CREATE TABLE IF NOT EXISTS public.postpipe_submissions (
+                CREATE TABLE IF NOT EXISTS ${tableName} (
                     id SERIAL PRIMARY KEY,
                     form_id TEXT NOT NULL,
                     submission_id TEXT UNIQUE NOT NULL,
@@ -117,13 +124,15 @@ export class PostgresAdapter implements DatabaseAdapter {
             `;
             await pool.query(createTableQuery);
 
+            const indexName = `idx_form_id_${tableName.replace('public.', '')}`;
             const createIndexQuery = `
-                CREATE INDEX IF NOT EXISTS idx_form_id ON public.postpipe_submissions(form_id);
+                CREATE INDEX IF NOT EXISTS ${indexName} ON ${tableName}(form_id);
             `;
             await pool.query(createIndexQuery);
+            initializedTables.add(tableName);
             console.log("[PostgresAdapter] Table verification complete.");
         } catch (error) {
-            console.error("[PostgresAdapter] FAILED to verify/create table:", error);
+            console.error(`[PostgresAdapter] FAILED to verify/create table ${tableName}:`, error);
             throw error;
         }
     }
@@ -131,20 +140,22 @@ export class PostgresAdapter implements DatabaseAdapter {
     async connect(payload?: PostPipeIngestPayload) {
         const connectionString = this.resolveConnectionString(payload);
         const alias = (payload as any)?.targetDatabase || (payload as any)?.targetDb;
+        const dbName = (payload as any)?.databaseConfig?.dbName;
         if (connectionString) {
-            await this.getPool(connectionString, alias);
+            await this.getPool(connectionString, alias, dbName);
         }
     }
 
     async insert(submission: PostPipeIngestPayload): Promise<void> {
         const connectionString = this.resolveConnectionString(submission);
         const alias = (submission as any).targetDatabase || (submission as any).targetDb;
+        const dbName = (submission as any).databaseConfig?.dbName;
 
         if (!connectionString) {
             throw new Error(`[PostgresAdapter] No connection string resolved.`);
         }
 
-        const pool = await this.getPool(connectionString, alias);
+        const pool = await this.getPool(connectionString, alias, dbName);
         
         // ARCHITECT LEVEL OPTIMIZATION: Payload Sanitization
         const { 
@@ -156,8 +167,10 @@ export class PostgresAdapter implements DatabaseAdapter {
         delete cleanData.targetDatabase;
         delete cleanData.targetDb;
 
+        const tableName = this.getTableName(alias, dbName);
+
         const query = `
-            INSERT INTO public.postpipe_submissions (form_id, submission_id, data, timestamp)
+            INSERT INTO ${tableName} (form_id, submission_id, data, timestamp)
             VALUES ($1, $2, $3, $4)
             ON CONFLICT (submission_id) DO NOTHING;
         `;
@@ -175,14 +188,16 @@ export class PostgresAdapter implements DatabaseAdapter {
     async query(formId: string, options?: any): Promise<PostPipeIngestPayload[]> {
         const connectionString = this.resolveConnectionString(options);
         const alias = options?.targetDatabase || options?.targetDb;
+        const dbName = options?.databaseConfig?.dbName;
         if (!connectionString) throw new Error("[PostgresAdapter] Cannot query: No connection string.");
         
-        const pool = await this.getPool(connectionString, alias);
+        const pool = await this.getPool(connectionString, alias, dbName);
         
+        const tableName = this.getTableName(alias, dbName);
         const limit = options?.limit || 50;
         const query = `
             SELECT submission_id as "submissionId", data, timestamp, form_id as "formId"
-            FROM public.postpipe_submissions
+            FROM ${tableName}
             WHERE form_id = $1
             ORDER BY timestamp DESC
             LIMIT $2;

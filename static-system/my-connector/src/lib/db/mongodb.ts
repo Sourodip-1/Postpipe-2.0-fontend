@@ -130,7 +130,7 @@ export class MongoAdapter implements DatabaseAdapter {
     try {
       // mongodb://user:pass@host/dbname?options or mongodb+srv://...
       const match = uri.match(/^mongodb(?:\+srv)?:\/\/[^/]+\/([^?#]+)/);
-      if (match) return match[1];
+      if (match && match[1] && match[1].trim() !== '') return match[1];
     } catch (e) {}
     return undefined;
   }
@@ -169,7 +169,8 @@ export class MongoAdapter implements DatabaseAdapter {
       dbName = targetName;
     } else {
       const extracted = uri ? this.extractDbNameFromUri(uri) : undefined;
-      if (extracted) {
+      // Many MongoDB cloud URIs end with /?retryWrites=true which makes extracted ""
+      if (extracted && extracted.trim() !== '') {
         dbName = extracted;
       }
     }

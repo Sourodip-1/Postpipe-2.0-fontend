@@ -66,7 +66,82 @@ This project is set up as a standard Express app. To deploy to Vercel, simply ad
 
 This connector supports routing submissions to different databases based on the Form configuration.
 
-### 1. Configure in Web App
+### 🧭 Core Routing Logic
+
+When a payload arrives from PostPipe, the connector inspects the `targetDatabase` alias. This alias determines where the data goes.
+
+```mermaid
+graph TD
+    A[Form Submission Incoming] --> B{Does Submission have an explicit active Alias defined?}
+
+    B -- Yes (e.g., 'second-db') --> C{Is the Alias a Technical/System term?}
+    C -- No --> D[Use Custom Alias Name]
+    D --> E[Postgres: Creates table 'public.second_db']
+    D --> F[MongoDB: Saves to database 'second-db']
+
+    C -- Yes (e.g., 'postgres_url', 'mongodb') --> G[Fallback to Defaults]
+    G --> H[Postgres: Creates table 'public.postpipe_submissions']
+    G --> I[MongoDB: Saves to database 'postpipe']
+
+    B -- No (Default Form Route) --> G
+```
+
+#### 1. Primary Form Routing (`targetDatabase`)
+
+When a form has an explicit **Target Database** set in the builder (like `main-db` or `second-db`), the connector actively prioritizes that exact name.
+
+- **MongoDB:** It connects to the provided connection string and uses the alias as the _database name_. (e.g., connects strictly to the `main-db` database).
+- **Postgres:** It connects using the provided connection string and generates a valid SQL table name from the alias. (e.g., `main-db` becomes the `public.main_db` table).
+
+#### 2. Defaulting (No Alias)
+
+If the form has no target custom database set and falls back to the default project connectors (like `MONGODB_URI` or `POSTGRES_URL` environment variables), the system recognizes these are raw connection strings, not human-readable alias labels.
+
+To avoid creating weird databases named "mongodb" or tables named "public.postgres_url", it securely defaults to:
+
+- **MongoDB:** The `postpipe` database.
+- **Postgres:** The `public.postpipe_submissions` table.
+
+---
+
+### 🔀 Advanced Breakpoint Routing
+
+When a form uses Advanced Breakpoints (Conditional Logic) to split data to secondary databases based on submission values, the connector handles the routed data independently of the main form target.
+
+```mermaid
+graph TD
+    A[Breakpoint Rule Triggered] --> B[Data matches Breakpoint Split]
+    B --> C[Connector reads the Breakpoint's target string]
+    C --> D{Is the assigned target string a custom Alias?}
+
+    D -- Yes (e.g., 'main-db') --> E[Postgres: Table 'public.main_db']
+    D -- Yes (e.g., 'main-db') --> F[MongoDB: Database 'main-db']
+
+    D -- No (It's a .env connection variable like 'POSTGRES_URL') --> G[Fallback to Technical Default]
+    G --> H[Postgres: Table 'public.postpipe_submissions']
+    G --> I[MongoDB: Database 'postpipe']
+```
+
+Because Breakpoints are configured dynamically in the builder, they can either securely target a named Database Alias (like `main-db`) or fall back directly to the base environment variables (`POSTGRES_URL`).
+
+If a Breakpoint routes strictly to the base variable without a named alias, the connector recognizes this and guarantees the data lands seamlessly in your primary default database/tables (`postpipe` and `public.postpipe_submissions`).
+
+---
+
+### 🛠 Naming Conventions
+
+The connector is designed to guarantee SQL compatibility in Postgres. You can safely name your databases with hyphens or spaces in the builder UI without breaking the connector.
+
+| Custom Builder Alias       | MongoDB Database Name | Postgres Table Name           |
+| :------------------------- | :-------------------- | :---------------------------- |
+| `main-db`                  | `main-db`             | `public.main_db`              |
+| `marketing forms`          | `marketing forms`     | `public.marketing_forms`      |
+| `second-db`                | `second-db`           | `public.second_db`            |
+| _(None /_ `MONGODB_URI`)\* | `postpipe`            | `public.postpipe_submissions` |
+
+---
+
+### Basic Settings in Web App
 
 In the **Form Builder**, use the **Target Database** feature:
 
