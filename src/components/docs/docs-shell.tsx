@@ -8,6 +8,8 @@ import {
     Terminal,
     ShieldCheck,
     User,
+    ArrowLeftToLine,
+    ArrowRightFromLine,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ShaderBackground } from "@/components/ui/shader-background";
@@ -63,6 +65,21 @@ export default function DocsShell({
                             {navItems.map((link, idx) => (
                                 <SidebarLink key={idx} link={link} />
                             ))}
+                        </div>
+
+                        {/* Collapse Toggle */}
+                        <div onClick={() => setOpen(!open)} className="cursor-pointer mt-4 pt-4 border-t border-white/10 mt-auto mb-4">
+                            <SidebarLink
+                                link={{
+                                    label: open ? "Collapse Sidebar" : "Expand Sidebar",
+                                    href: "#",
+                                    icon: open ? (
+                                        <ArrowLeftToLine className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
+                                    ) : (
+                                        <ArrowRightFromLine className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
+                                    )
+                                }}
+                            />
                         </div>
                     </div>
                 </SidebarBody>

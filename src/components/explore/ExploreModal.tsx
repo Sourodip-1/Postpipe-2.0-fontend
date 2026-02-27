@@ -111,7 +111,7 @@ export function ExploreModal({ open, onOpenChange, item }: ExploreModalProps) {
                                     <div className="flex flex-col md:flex-row items-start md:items-center justify-between border-b p-4 bg-background/50 backdrop-blur-md sticky top-0 z-10 gap-4 md:gap-0">
                                         <div className="flex items-center gap-3 w-full md:w-auto">
                                             <Avatar className="h-10 w-10 flex items-center justify-center rounded-lg border">
-                                                <AvatarImage src={item.author.avatar} alt={item.title} className="object-cover" />
+                                                <AvatarImage src={item.author.avatar} alt={item.title} className={cn("object-cover", item.author.name === "PostPipe" && "invert dark:invert-0")} />
                                                 <AvatarFallback className="rounded-lg bg-muted text-lg font-bold">
                                                     {item.title.substring(0, 2)}
                                                 </AvatarFallback>

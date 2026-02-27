@@ -4,13 +4,17 @@
 import dbConnect from "@/lib/auth/mongodb";
 import Template from "@/lib/models/Template";
 
-export async function getTemplates(searchQuery?: string, category?: string) {
+export async function getTemplates(searchQuery?: string, category?: string, tag?: string) {
   await dbConnect();
   try {
     const query: any = { isPublished: true };
-    
+
     if (category) {
       query.category = category;
+    }
+
+    if (tag) {
+      query.tags = tag;
     }
 
     if (searchQuery) {
@@ -37,7 +41,7 @@ export async function getExploreFilters() {
   await dbConnect();
   try {
     const templates = await Template.find({ isPublished: true }).select('category tags').lean();
-    
+
     const categories = new Set<string>();
     const tags = new Set<string>();
 

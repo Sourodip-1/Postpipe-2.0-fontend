@@ -17,6 +17,8 @@ import {
     Activity,
     UserCog,
     Database,
+    ArrowLeftToLine,
+    ArrowRightFromLine,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect } from "react";
@@ -122,6 +124,21 @@ export default function DashboardShell({
                                     label: "Logout",
                                     href: "#",
                                     icon: <LogOut className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
+                                }}
+                            />
+                        </div>
+
+                        {/* Collapse Toggle */}
+                        <div onClick={() => setOpen(!open)} className="cursor-pointer mt-4 pt-4 border-t border-neutral-200 dark:border-neutral-700">
+                            <SidebarLink
+                                link={{
+                                    label: open ? "Collapse Sidebar" : "Expand Sidebar",
+                                    href: "#",
+                                    icon: open ? (
+                                        <ArrowLeftToLine className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
+                                    ) : (
+                                        <ArrowRightFromLine className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
+                                    )
                                 }}
                             />
                         </div>

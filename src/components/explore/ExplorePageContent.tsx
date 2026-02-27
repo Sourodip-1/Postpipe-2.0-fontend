@@ -100,7 +100,7 @@ export function ExplorePageContent({ templates = [] }: ExplorePageContentProps) 
                         quantity={100}
                         ease={80}
                         color={mounted && resolvedTheme === "dark" ? "#ffffff" : "#000000"}
-                        refresh
+                        refresh={false}
                     />
                     <div className="flex flex-col gap-3 relative z-10 max-w-3xl">
                         <div className="inline-flex items-center rounded-full border border-neutral-200 dark:border-white/10 bg-neutral-100 dark:bg-white/5 px-3 py-1 text-xs font-medium text-neutral-900 dark:text-white backdrop-blur-md w-fit mb-2">
@@ -132,11 +132,11 @@ export function ExplorePageContent({ templates = [] }: ExplorePageContentProps) 
                     {masterTemplates.length === 1 ? (
                         <div className="relative w-full overflow-hidden rounded-xl border border-border/50 bg-white dark:bg-neutral-950 shadow-2xl group cursor-pointer" onClick={() => setSelectedItem(masterTemplates[0])}>
                             {/* Hero Banner Background - using the thumbnail as a blurred backdrop */}
-                            <div className="absolute inset-0 z-0">
+                            <div className="absolute inset-0 z-0 overflow-hidden">
                                 <img
                                     src={masterTemplates[0].thumbnailUrl || masterTemplates[0].demoGifUrl || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=60"}
                                     alt="Background"
-                                    className="h-full w-full object-cover opacity-10 dark:opacity-20 blur-2xl transition-transform duration-700 group-hover:scale-110"
+                                    className="h-full w-full object-cover opacity-10 dark:opacity-20 blur-md"
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-r from-white via-white/80 dark:from-neutral-950 dark:via-neutral-950/80 to-transparent" />
                             </div>

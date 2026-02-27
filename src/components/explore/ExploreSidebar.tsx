@@ -10,6 +10,8 @@ import {
     Tag,
     Home,
     Search,
+    ArrowLeftToLine,
+    ArrowRightFromLine,
 } from "lucide-react";
 import { usePathname, useSearchParams } from "next/navigation";
 
@@ -82,7 +84,7 @@ export function ExploreSidebar({ open, setOpen }: ExploreSidebarProps) {
                 const data = await getExploreFilters();
                 const categoryLinks = (data?.categories || []).map((cat: string) => ({
                     label: cat,
-                    href: `?category=${encodeURIComponent(cat)}`,
+                    href: `/explore?category=${encodeURIComponent(cat)}`,
                     icon: (
                         <Layers className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
                     ),
@@ -90,7 +92,7 @@ export function ExploreSidebar({ open, setOpen }: ExploreSidebarProps) {
                 }));
                 const tagLinks = (data?.tags || []).map((tag: string) => ({
                     label: tag,
-                    href: `?tag=${encodeURIComponent(tag)}`,
+                    href: `/explore?tag=${encodeURIComponent(tag)}`,
                     icon: (
                         <Tag className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
                     ),
@@ -130,19 +132,20 @@ export function ExploreSidebar({ open, setOpen }: ExploreSidebarProps) {
     // Custom Link Wrapper to handle active state styling
     const RenderLink = ({ link }: { link: any }) => {
         const active = isActive(link);
+        const isSubItem = !link.icon;
+
         return (
-            <div onClick={link.onClick ? (e) => { e.preventDefault(); link.onClick(); } : undefined}>
-                <SidebarLink
-                    link={link}
-                    className={cn(
-                        "rounded-lg transition-all duration-200 group/link",
-                        open ? "px-3 py-2" : "px-0 py-2 justify-center",
-                        active
-                            ? "bg-neutral-100 dark:bg-primary/10 text-neutral-900 dark:text-primary font-medium"
-                            : "text-neutral-600 dark:text-muted-foreground hover:bg-neutral-100 dark:hover:bg-white/5 hover:text-neutral-900 dark:hover:text-foreground transparent"
-                    )}
-                />
-            </div>
+            <SidebarLink
+                link={link}
+                props={link.onClick ? { onClick: (e: any) => { e.preventDefault(); link.onClick(); }, href: link.href as any } : undefined}
+                className={cn(
+                    "transition-all duration-300 group/link overflow-hidden whitespace-nowrap",
+                    open ? cn("px-3 py-1.5 rounded-lg w-full", isSubItem && "ml-5 text-[13px]") : "p-0 justify-center h-10 w-10 mx-auto rounded-md flex items-center mb-1",
+                    active
+                        ? "bg-neutral-100 dark:bg-primary/10 text-neutral-900 dark:text-primary font-medium"
+                        : "text-neutral-600 dark:text-muted-foreground hover:bg-neutral-100 dark:hover:bg-white/5 hover:text-neutral-900 dark:hover:text-foreground transparent"
+                )}
+            />
         );
     };
 
@@ -152,37 +155,70 @@ export function ExploreSidebar({ open, setOpen }: ExploreSidebarProps) {
                 <SidebarBody className="justify-between gap-10 bg-white dark:bg-neutral-950 border-r border-neutral-200 dark:border-white/10">
                     <div className="flex flex-col flex-1 overflow-hidden relative">
                         <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden pb-10 scrollbar-none">
-                            {open ? <Logo /> : <LogoIcon />}
-                            <div className="mt-8 flex flex-col gap-8">
+                            <motion.div layout initial={false} className="flex-shrink-0">
+                                {open ? <Logo /> : <LogoIcon />}
+                            </motion.div>
+                            <div className={cn("flex flex-col transition-all duration-300", open ? "mt-6 gap-3" : "mt-4 gap-0")}>
                                 {/* Main Menu */}
-                                <div className="flex flex-col gap-1">
-                                    <h4 className={cn("text-[10px] font-bold text-neutral-500 dark:text-muted-foreground/40 mb-2 px-3 uppercase tracking-widest", !open && "hidden")}>Menu</h4>
+                                <div className={cn("flex flex-col w-full transition-all duration-300", !open ? "mx-auto w-8 gap-0" : "gap-1")}>
+                                    <h4 className={cn("text-[10px] font-bold text-neutral-500 dark:text-muted-foreground/40 mb-2 px-3 uppercase tracking-widest transition-all duration-300 overflow-hidden whitespace-nowrap", !open && "opacity-0 h-0 m-0 p-0")}>Menu</h4>
                                     {links.filter(l => l.group === 'main').map((link, idx) => (
                                         <RenderLink key={idx} link={link} />
                                     ))}
                                 </div>
 
                                 {/* Categories */}
-                                <div className={cn("flex flex-col gap-1", !open && "hidden")}>
-                                    <h4 className="text-[10px] font-bold text-neutral-500 dark:text-muted-foreground/40 mb-2 px-3 uppercase tracking-widest">Categories</h4>
-                                    {links.filter(l => l.group === 'category').map((link, idx) => (
-                                        <RenderLink key={idx} link={link} />
-                                    ))}
-                                </div>
+                                {links.filter(l => l.group === 'category').length > 0 && (
+                                    <>
+                                        <div className={cn("border-t border-neutral-200 dark:border-white/10 mx-auto w-6 my-2 transition-opacity duration-300", open ? "opacity-0 h-0 my-0 border-0" : "opacity-100")} />
+                                        <div className={cn("flex flex-col gap-1 w-full")}>
+                                            <div className={cn("flex items-center gap-2 px-3 mb-1 mt-4 border-t border-neutral-200 dark:border-white/10 pt-4 text-primary font-bold overflow-hidden transition-all duration-300 whitespace-nowrap", !open && "opacity-0 h-0 overflow-hidden m-0 p-0 border-0")}>
+                                                <Layers className="h-4 w-4 flex-shrink-0" />
+                                                <h4 className="text-[11px] uppercase tracking-widest m-0 flex-shrink-0 whitespace-nowrap">Categories</h4>
+                                            </div>
+                                            {!open && (
+                                                <div className="flex justify-center text-neutral-500 dark:text-muted-foreground transition-colors group-hover:text-primary relative group cursor-pointer" title="Categories">
+                                                    <Layers className="h-5 w-5 flex-shrink-0" />
+                                                </div>
+                                            )}
+                                            {links.filter(l => l.group === 'category').map((link, idx) => (
+                                                <div key={idx} className={cn(!open && "hidden")}>
+                                                    <RenderLink link={{ ...link, icon: undefined }} />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
 
                                 {/* Tags */}
-                                <div className={cn("flex flex-col gap-1", !open && "hidden")}>
-                                    <h4 className="text-[10px] font-bold text-neutral-500 dark:text-muted-foreground/40 mb-2 px-3 uppercase tracking-widest">Tags</h4>
-                                    {links.filter(l => l.group === 'tag').map((link, idx) => (
-                                        <RenderLink key={idx} link={link} />
-                                    ))}
-                                </div>
+                                {links.filter(l => l.group === 'tag').length > 0 && (
+                                    <>
+                                        <div className={cn("border-t border-neutral-200 dark:border-white/10 mx-auto w-6 my-2 transition-opacity duration-300", open ? "opacity-0 h-0 my-0 border-0" : "opacity-100")} />
+                                        <div className={cn("flex flex-col gap-1 w-full")}>
+                                            <div className={cn("flex items-center gap-2 px-3 mb-1 mt-4 border-t border-neutral-200 dark:border-white/10 pt-4 text-primary font-bold overflow-hidden transition-all duration-300 whitespace-nowrap", !open && "opacity-0 h-0 overflow-hidden m-0 p-0 border-0")}>
+                                                <Tag className="h-4 w-4 flex-shrink-0" />
+                                                <h4 className="text-[11px] uppercase tracking-widest m-0 flex-shrink-0 whitespace-nowrap">Tags</h4>
+                                            </div>
+                                            {!open && (
+                                                <div className="flex justify-center text-neutral-500 dark:text-muted-foreground transition-colors group-hover:text-primary relative group cursor-pointer" title="Tags">
+                                                    <Tag className="h-5 w-5 flex-shrink-0" />
+                                                </div>
+                                            )}
+                                            {links.filter(l => l.group === 'tag').map((link, idx) => (
+                                                <div key={idx} className={cn(!open && "hidden")}>
+                                                    <RenderLink link={{ ...link, icon: undefined }} />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
                         {/* Fade/Blur overlay */}
                         <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-white dark:from-neutral-950 to-transparent pointer-events-none" />
                     </div>
-                    <div>
+
+                    <div className="flex flex-col gap-1">
                         <SidebarLink
                             link={{
                                 label: user?.name || "User",
@@ -198,8 +234,24 @@ export function ExploreSidebar({ open, setOpen }: ExploreSidebarProps) {
                                     </div>
                                 ),
                             }}
-                            className="rounded-lg px-3 py-2 hover:bg-neutral-100 dark:hover:bg-white/5 transition-all duration-200 text-neutral-600 dark:text-neutral-200"
+                            className={cn("rounded-lg hover:bg-neutral-100 dark:hover:bg-white/5 transition-all duration-300 text-neutral-600 dark:text-neutral-200 overflow-hidden", open ? "px-3 py-2" : "px-0 py-2 justify-center w-full")}
                         />
+
+                        {/* Collapse Toggle */}
+                        <div onClick={() => setOpen(!open)} className="cursor-pointer mt-4 pt-4 border-t border-neutral-200 dark:border-white/10 overflow-hidden">
+                            <SidebarLink
+                                link={{
+                                    label: open ? "Collapse Sidebar" : "Expand Sidebar",
+                                    href: "#",
+                                    icon: open ? (
+                                        <ArrowLeftToLine className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
+                                    ) : (
+                                        <ArrowRightFromLine className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
+                                    )
+                                }}
+                                className={cn("rounded-lg hover:bg-neutral-100 dark:hover:bg-white/5 transition-all duration-300", open ? "px-3 py-2" : "px-0 py-2 justify-center w-full")}
+                            />
+                        </div>
                     </div>
                 </SidebarBody>
             </Sidebar>
