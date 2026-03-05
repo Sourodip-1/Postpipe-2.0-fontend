@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { updateProfile } from '@/lib/auth/actions';
+import { compressImage } from '@/lib/image-compression';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Lock, User, Mail, Upload, Loader2, Link as LinkIcon, AlertCircle, CheckCircle2 } from "lucide-react";
@@ -65,10 +66,11 @@ export default function ProfileClient() {
         if (!file) return;
 
         setIsUploading(true);
-        const formData = new FormData();
-        formData.append('file', file);
-
         try {
+            const compressedFile = await compressImage(file);
+            const formData = new FormData();
+            formData.append('file', compressedFile);
+
             const res = await fetch('/api/upload', {
                 method: 'POST',
                 body: formData,

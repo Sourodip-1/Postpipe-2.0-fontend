@@ -96,9 +96,36 @@ export default function BuilderPage() {
       var uploads = Array.from(inputs).map(async function(input) {
         if (!input.name) return;
         if (input.type === 'file' && input.files && input.files[0]) {
-          var fd = new FormData();
-          fd.append('file', input.files[0]);
           try {
+            var fileInfo = input.files[0];
+            var compressed = fileInfo;
+            if (fileInfo.type.startsWith('image/')) {
+              compressed = await new Promise(function(resolve) {
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                  var img = new Image();
+                  img.onload = function() {
+                    var canvas = document.createElement('canvas');
+                    var w = img.width, h = img.height, max = 1000;
+                    if (w > max) { h = Math.round((h * max) / w); w = max; }
+                    canvas.width = w; canvas.height = h;
+                    var ctx = canvas.getContext('2d');
+                    if (!ctx) return resolve(fileInfo);
+                    ctx.drawImage(img, 0, 0, w, h);
+                    canvas.toBlob(function(b) {
+                      if (b) resolve(new File([b], fileInfo.name, {type: 'image/jpeg'}));
+                      else resolve(fileInfo);
+                    }, 'image/jpeg', 0.8);
+                  };
+                  img.onerror = function() { resolve(fileInfo); };
+                  img.src = e.target.result;
+                };
+                reader.onerror = function() { resolve(fileInfo); };
+                reader.readAsDataURL(fileInfo);
+              });
+            }
+            var fd = new FormData();
+            fd.append('file', compressed);
             var res = await fetch('${connectorUrl}/postpipe/upload', { method: 'POST', body: fd });
             var data = await res.json();
             if (!res.ok || !data.url) throw new Error(data.error || 'Upload failed');
