@@ -104,36 +104,41 @@ export class PostgresAdapter implements DatabaseAdapter {
 
     private async ensureTable(pool: Pool, alias?: string, dbName?: string) {
         const tableName = this.getTableName(alias, dbName);
+        const authTableName = tableName.replace(/[^.]+$/, 'postpipe_users');
         
-        // Skip if we already initialized this specific table in this runtime
-        if (initializedTables.has(tableName)) {
-            return;
+        // 1. Ensure Submissions Table
+        if (!initializedTables.has(tableName)) {
+            try {
+                console.log(`[PostgresAdapter] Verifying table '${tableName}' exists...`);
+                const createTableQuery = `
+                    CREATE TABLE IF NOT EXISTS ${tableName} (
+                        id SERIAL PRIMARY KEY,
+                        form_id TEXT NOT NULL,
+                        submission_id TEXT UNIQUE NOT NULL,
+                        data JSONB NOT NULL,
+                        timestamp TIMESTAMPTZ NOT NULL,
+                        created_at TIMESTAMPTZ DEFAULT NOW()
+                    );
+                `;
+                await pool.query(createTableQuery);
+
+                const indexName = `idx_form_id_${tableName.replace('public.', '')}`;
+                const createIndexQuery = `
+                    CREATE INDEX IF NOT EXISTS ${indexName} ON ${tableName}(form_id);
+                `;
+                await pool.query(createIndexQuery);
+                initializedTables.add(tableName);
+                console.log(`[PostgresAdapter] Submissions table '${tableName}' verified.`);
+            } catch (error) {
+                console.error(`[PostgresAdapter] FAILED to verify/create table ${tableName}:`, error);
+                // We show error but continue to try Auth table
+            }
         }
 
-        try {
-            console.log(`[PostgresAdapter] Verifying table '${tableName}' exists...`);
-            const createTableQuery = `
-                CREATE TABLE IF NOT EXISTS ${tableName} (
-                    id SERIAL PRIMARY KEY,
-                    form_id TEXT NOT NULL,
-                    submission_id TEXT UNIQUE NOT NULL,
-                    data JSONB NOT NULL,
-                    timestamp TIMESTAMPTZ NOT NULL,
-                    created_at TIMESTAMPTZ DEFAULT NOW()
-                );
-            `;
-            await pool.query(createTableQuery);
-
-            const indexName = `idx_form_id_${tableName.replace('public.', '')}`;
-            const createIndexQuery = `
-                CREATE INDEX IF NOT EXISTS ${indexName} ON ${tableName}(form_id);
-            `;
-            await pool.query(createIndexQuery);
-            initializedTables.add(tableName);
-
-            // Also ensure Auth Table exists on this database
-            const authTableName = this.getTableName(alias, dbName).replace(/[^.]+$/, 'postpipe_users');
-            if (!initializedTables.has(authTableName)) {
+        // 2. Ensure Auth Table
+        if (!initializedTables.has(authTableName)) {
+            try {
+                console.log(`[PostgresAdapter] Verifying auth table '${authTableName}' exists...`);
                 await pool.query(`
                     CREATE TABLE IF NOT EXISTS ${authTableName} (
                         id TEXT PRIMARY KEY,
@@ -144,16 +149,28 @@ export class PostgresAdapter implements DatabaseAdapter {
                         provider_id TEXT,
                         avatar TEXT,
                         created_at TIMESTAMPTZ DEFAULT NOW(),
-                        last_login TIMESTAMPTZ DEFAULT NOW()
+                        last_login TIMESTAMPTZ DEFAULT NOW(),
+                        email_verified BOOLEAN DEFAULT true,
+                        otp_code TEXT,
+                        otp_expires_at TIMESTAMPTZ
                     );
                 `);
+                
+                // For existing databases without the column, attempt to add it silently
+                try {
+                    await pool.query(`ALTER TABLE ${authTableName} ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT true`);
+                    await pool.query(`ALTER TABLE ${authTableName} ADD COLUMN IF NOT EXISTS otp_code TEXT`);
+                    await pool.query(`ALTER TABLE ${authTableName} ADD COLUMN IF NOT EXISTS otp_expires_at TIMESTAMPTZ`);
+                } catch (e) {
+                    // Ignore column already exists or other minor errors
+                }
+                
                 initializedTables.add(authTableName);
+                console.log(`[PostgresAdapter] Auth table '${authTableName}' verified.`);
+            } catch (error) {
+                console.error(`[PostgresAdapter] FAILED to verify/create auth table ${authTableName}:`, error);
+                throw error; // Auth failure is critical for auth flows
             }
-
-            console.log("[PostgresAdapter] Table verification complete.");
-        } catch (error) {
-            console.error(`[PostgresAdapter] FAILED to verify/create table ${tableName}:`, error);
-            throw error;
         }
     }
 
@@ -259,13 +276,13 @@ export class PostgresAdapter implements DatabaseAdapter {
         
         const authTableName = this.getTableName(context?.targetDatabase).replace(/[^.]+$/, 'postpipe_users');
         await pool.query(`
-            INSERT INTO ${authTableName} (id, email, name, password_hash, provider, provider_id, avatar, created_at, last_login)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            INSERT INTO ${authTableName} (id, email, name, password_hash, provider, provider_id, avatar, created_at, last_login, email_verified)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             ON CONFLICT (email) DO NOTHING;
         `, [
             user.id, user.email, user.name, user.password_hash, 
             user.provider, user.provider_id, user.avatar, 
-            user.created_at, user.last_login
+            user.created_at, user.last_login, user.email_verified
         ]);
         console.log(`[PostgresAdapter] Inserted Auth User: ${user.email}`);
     }
@@ -277,6 +294,33 @@ export class PostgresAdapter implements DatabaseAdapter {
         
         const authTableName = this.getTableName(context?.targetDatabase).replace(/[^.]+$/, 'postpipe_users');
         await pool.query(`UPDATE ${authTableName} SET last_login = NOW() WHERE id = $1`, [userId]);
+    }
+
+    async updateUserPassword(userId: string, newPasswordHash: string, context?: any) {
+        const connectionString = this.resolveConnectionString(context);
+        if (!connectionString) return;
+        const pool = await this.getPool(connectionString, context?.targetDatabase);
+        
+        const authTableName = this.getTableName(context?.targetDatabase).replace(/[^.]+$/, 'postpipe_users');
+        await pool.query(`UPDATE ${authTableName} SET password_hash = $1 WHERE id = $2`, [newPasswordHash, userId]);
+    }
+
+    async verifyUserEmail(userId: string, context?: any) {
+        const connectionString = this.resolveConnectionString(context);
+        if (!connectionString) return;
+        const pool = await this.getPool(connectionString, context?.targetDatabase);
+        
+        const authTableName = this.getTableName(context?.targetDatabase).replace(/[^.]+$/, 'postpipe_users');
+        await pool.query(`UPDATE ${authTableName} SET email_verified = true, otp_code = NULL, otp_expires_at = NULL WHERE id = $1`, [userId]);
+    }
+    
+    async updateUserOtp(userId: string, otp: string, expiresAt: Date, context?: any) {
+        const connectionString = this.resolveConnectionString(context);
+        if (!connectionString) return;
+        const pool = await this.getPool(connectionString, context?.targetDatabase);
+        
+        const authTableName = this.getTableName(context?.targetDatabase).replace(/[^.]+$/, 'postpipe_users');
+        await pool.query(`UPDATE ${authTableName} SET otp_code = $1, otp_expires_at = $2 WHERE id = $3`, [otp, expiresAt, userId]);
     }
 
     async disconnect() {

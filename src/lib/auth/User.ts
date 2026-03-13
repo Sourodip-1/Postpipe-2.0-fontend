@@ -41,6 +41,8 @@ const UserSchema = new mongoose.Schema({
     verifyTokenExpiry: Date,
     forgotPasswordToken: String,
     forgotPasswordTokenExpiry: Date,
+    resetTokenHash: String,
+    resetTokenExpiry: Date,
 }, { timestamps: true });
 
 export default mongoose.models.User || mongoose.model('User', UserSchema);

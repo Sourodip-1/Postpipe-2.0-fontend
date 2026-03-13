@@ -39,6 +39,9 @@ export interface DatabaseAdapter {
   findUserByEmail(email: string, context?: any): Promise<any>;
   insertUser(user: any, context?: any): Promise<void>;
   updateUserLastLogin(userId: string, context?: any): Promise<void>;
+  updateUserPassword(userId: string, newPasswordHash: string, context?: any): Promise<void>;
+  verifyUserEmail(userId: string, context?: any): Promise<void>;
+  updateUserOtp(userId: string, otp: string, expiresAt: Date, context?: any): Promise<void>;
 }
 
 export interface ConnectorConfig {

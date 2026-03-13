@@ -16,6 +16,14 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
+import {
     Select,
     SelectContent,
     SelectItem,
@@ -63,6 +71,7 @@ export default function FormsClient({ initialForms = [], initialPresets = [] }: 
     const [expandedFormId, setExpandedFormId] = React.useState<string | null>(null);
     const [copiedId, setCopiedId] = React.useState<string | null>(null);
     const [searchExpanded, setSearchExpanded] = React.useState(false);
+
 
     React.useEffect(() => { setPresets(initialPresets); }, [initialPresets]);
 
@@ -535,8 +544,7 @@ export default function FormsClient({ initialForms = [], initialPresets = [] }: 
         apiUrl: "${preset.apiUrl || ''}",
         projectId: "${preset.projectId || ''}",
         providers: [${providers}],
-        redirectUrl: window.location.origin,
-        targetDatabase: "${preset.targetDatabase || ''}"
+        redirectUrl: ${(!preset.redirectUrl || preset.redirectUrl === 'window.location.origin') ? 'window.location.origin' : `"${preset.redirectUrl}"`}${preset.targetDatabase && preset.targetDatabase !== 'default' ? `,\n        targetDatabase: "${preset.targetDatabase}"` : ''}
     });
 
     PostpipeAuth.on("success", (user) => {
@@ -580,6 +588,7 @@ export default function FormsClient({ initialForms = [], initialPresets = [] }: 
                     </TabsContent>
                 </Tabs>
             </div >
+
         </div >
     );
 }

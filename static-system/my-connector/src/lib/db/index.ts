@@ -73,4 +73,26 @@ class MemoryAdapter implements DatabaseAdapter {
       user.last_login = new Date().toISOString();
     }
   }
+  async updateUserPassword(userId: string, newPasswordHash: string) {
+    const user = this.users.find(u => u.id === userId);
+    if (user) {
+      user.password_hash = newPasswordHash;
+    }
+  }
+  async verifyUserEmail(userId: string) {
+    const user = this.users.find(u => u.id === userId);
+    if (user) {
+      user.email_verified = true;
+      user.otp_code = null;
+      user.otp_expires_at = null;
+    }
+  }
+
+  async updateUserOtp(userId: string, otp: string, expiresAt: Date) {
+    const user = this.users.find(u => u.id === userId);
+    if (user) {
+      user.otp_code = otp;
+      user.otp_expires_at = expiresAt;
+    }
+  }
 }
