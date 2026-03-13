@@ -331,6 +331,39 @@ export class MongoAdapter implements DatabaseAdapter {
     await collection.updateOne({ id: userId }, { $set: { last_login: new Date().toISOString() } });
   }
 
+  async updateUserPassword(userId: string, newPasswordHash: string, context?: any) {
+    const uri = this.resolveConnectionString(context);
+    if (!uri) return;
+    const targetDbName = context?.targetDatabase || process.env.MONGODB_DB_NAME || 'postpipe';
+    
+    const client = await this.getClient(uri);
+    const db = client.db(targetDbName);
+    const collection = db.collection('postpipe_users');
+    await collection.updateOne({ id: userId }, { $set: { password_hash: newPasswordHash } });
+  }
+
+  async verifyUserEmail(userId: string, context?: any) {
+    const uri = this.resolveConnectionString(context);
+    if (!uri) return;
+    const targetDbName = context?.targetDatabase || process.env.MONGODB_DB_NAME || 'postpipe';
+    
+    const client = await this.getClient(uri);
+    const db = client.db(targetDbName);
+    const collection = db.collection('postpipe_users');
+    await collection.updateOne({ id: userId }, { $set: { email_verified: true, otp_code: null, otp_expires_at: null } });
+  }
+
+  async updateUserOtp(userId: string, otp: string, expiresAt: Date, context?: any) {
+    const uri = this.resolveConnectionString(context);
+    if (!uri) return;
+    const targetDbName = context?.targetDatabase || process.env.MONGODB_DB_NAME || 'postpipe';
+    
+    const client = await this.getClient(uri);
+    const db = client.db(targetDbName);
+    const collection = db.collection('postpipe_users');
+    await collection.updateOne({ id: userId }, { $set: { otp_code: otp, otp_expires_at: expiresAt } });
+  }
+
   private resolveConnectionString(context?: any): string | undefined {
     return this.getTargetConfig({ targetDatabase: context?.targetDatabase, databaseConfig: context?.databaseConfig } as any).uri;
   }

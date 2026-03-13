@@ -16,6 +16,14 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
+import {
     Select,
     SelectContent,
     SelectItem,
@@ -33,6 +41,7 @@ import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { deleteFormAction, duplicateFormAction, toggleFormStatusAction, deleteAuthPresetAction } from "@/app/actions/dashboard";
+import { getRawTokenAction } from "@/lib/auth/actions";
 import IsoLevelWarp from "@/components/ui/isometric-wave-grid-background";
 import { FormSearchBar } from "@/components/ui/animated-search-bar";
 import { motion, AnimatePresence } from "framer-motion";
@@ -63,6 +72,22 @@ export default function FormsClient({ initialForms = [], initialPresets = [] }: 
     const [expandedFormId, setExpandedFormId] = React.useState<string | null>(null);
     const [copiedId, setCopiedId] = React.useState<string | null>(null);
     const [searchExpanded, setSearchExpanded] = React.useState(false);
+    const [introspectionPreset, setIntrospectionPreset] = React.useState<any | null>(null);
+    const [rawToken, setRawToken] = React.useState<string | null>(null);
+    const [isLoadingToken, setIsLoadingToken] = React.useState(false);
+
+    const handleOpenIntrospection = async (preset: any) => {
+        setIntrospectionPreset(preset);
+        setIsLoadingToken(true);
+        try {
+            const token = await getRawTokenAction();
+            setRawToken(token);
+        } catch (error) {
+            console.error("Failed to fetch token:", error);
+        } finally {
+            setIsLoadingToken(false);
+        }
+    };
 
     React.useEffect(() => { setPresets(initialPresets); }, [initialPresets]);
 
@@ -516,6 +541,9 @@ export default function FormsClient({ initialForms = [], initialPresets = [] }: 
                                                     <Button variant="ghost" size="sm" className="h-8 text-xs text-neutral-500 dark:text-white/50 hover:text-neutral-800 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/[0.08] rounded-lg gap-1.5" onClick={() => setEditingPreset(preset)}>
                                                         <Edit className="h-3.5 w-3.5" /> Edit
                                                     </Button>
+                                                    <Button variant="ghost" size="sm" className="h-8 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg gap-1.5" onClick={() => handleOpenIntrospection(preset)}>
+                                                        <Activity className="h-3.5 w-3.5" /> Introspection
+                                                    </Button>
                                                     <Button variant="ghost" size="sm" className="h-8 text-xs text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-500/10 rounded-lg gap-1.5" onClick={() => {
                                                         const origin = typeof window !== 'undefined' ? window.location.origin : '';
                                                         const providers = [
@@ -535,8 +563,7 @@ export default function FormsClient({ initialForms = [], initialPresets = [] }: 
         apiUrl: "${preset.apiUrl || ''}",
         projectId: "${preset.projectId || ''}",
         providers: [${providers}],
-        redirectUrl: window.location.origin,
-        targetDatabase: "${preset.targetDatabase || ''}"
+        redirectUrl: ${(!preset.redirectUrl || preset.redirectUrl === 'window.location.origin') ? 'window.location.origin' : `"${preset.redirectUrl}"`}${preset.targetDatabase && preset.targetDatabase !== 'default' ? `,\n        targetDatabase: "${preset.targetDatabase}"` : ''}
     });
 
     PostpipeAuth.on("success", (user) => {
@@ -580,6 +607,68 @@ export default function FormsClient({ initialForms = [], initialPresets = [] }: 
                     </TabsContent>
                 </Tabs>
             </div >
+
+            {/* Introspection Dialog */}
+            <Dialog open={!!introspectionPreset} onOpenChange={(open: boolean) => !open && setIntrospectionPreset(null)}>
+                <DialogContent className="max-w-2xl bg-[#0D1117] border-[#30363D] text-[#E6EDF3]">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                            <Activity className="h-5 w-5 text-indigo-400" />
+                            Session Introspection
+                        </DialogTitle>
+                        <DialogDescription className="text-[#8B949E]">
+                            Use these credentials to fetch user data for the current session.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-6 py-4">
+                        <div className="space-y-3">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-[#8B949E] block">Endpoint URL (GET)</label>
+                            <div className="flex items-center gap-2">
+                                <div className="flex-1 rounded-xl border border-[#30363D] bg-black/40 px-3.5 py-2.5 font-mono text-xs text-[#7EE787] truncate">
+                                    {introspectionPreset?.apiUrl}/me
+                                </div>
+                                <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-10 w-10 rounded-xl hover:bg-[#30363D] text-[#8B949E] hover:text-white"
+                                    onClick={() => copyToClipboard(`${introspectionPreset?.apiUrl}/me`, "Endpoint URL copied!")}
+                                >
+                                    <Copy className="h-4 w-4" />
+                                </Button>
+                            </div>
+                            <p className="text-[10px] text-[#8B949E]">Returns the user profile from your application's database.</p>
+                        </div>
+
+                        <div className="space-y-3">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-[#8B949E] block">Bearer Token</label>
+                            <div className="flex items-center gap-2">
+                                <div className="flex-1 rounded-xl border border-[#30363D] bg-black/40 px-3.5 py-2.5 font-mono text-xs text-white/90 break-all h-24 overflow-y-auto font-sans">
+                                    {isLoadingToken ? "Loading token..." : (rawToken || "No active session found. Please login to your app.")}
+                                </div>
+                                <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-10 w-10 rounded-xl hover:bg-[#30363D] text-[#8B949E] hover:text-white shrink-0"
+                                    onClick={() => rawToken && copyToClipboard(rawToken, "Bearer token copied!")}
+                                    disabled={!rawToken || isLoadingToken}
+                                >
+                                    <Copy className="h-4 w-4" />
+                                </Button>
+                            </div>
+                            <p className="text-[10px] text-[#8B949E]">Include this in your requests as <code>Authorization: Bearer &lt;token&gt;</code></p>
+                        </div>
+
+                        <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 text-xs text-blue-300 flex gap-3">
+                            <Zap className="h-5 w-5 shrink-0" />
+                            <p>
+                                <strong>Mobile App Tip:</strong> For Expo Go or other environments that don't support cookies,
+                                pass this token in the header to authenticate requests with your app's <code>/me</code> endpoint.
+                            </p>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div >
     );
 }

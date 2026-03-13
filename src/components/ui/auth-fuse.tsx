@@ -160,15 +160,21 @@ Input.displayName = "Input";
 
 export interface PasswordInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
     label?: string;
+    labelDescription?: React.ReactNode;
 }
 const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
-    ({ className, label, ...props }, ref) => {
+    ({ className, label, labelDescription, ...props }, ref) => {
         const id = useId();
         const [showPassword, setShowPassword] = useState(false);
         const togglePasswordVisibility = () => setShowPassword((prev) => !prev);
         return (
             <div className="grid w-full items-center gap-2">
-                {label && <Label htmlFor={id}>{label}</Label>}
+                {label && (
+                    <div className="flex items-center">
+                        <Label htmlFor={id}>{label}</Label>
+                        {labelDescription && <div className="ml-auto inline-block text-sm">{labelDescription}</div>}
+                    </div>
+                )}
                 <div className="relative">
                     <Input id={id} type={showPassword ? "text" : "password"} className={cn("pe-10", className)} ref={ref} {...props} />
                     <button type="button" onClick={togglePasswordVisibility} className="absolute inset-y-0 end-0 flex h-full w-10 items-center justify-center text-muted-foreground/80 transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50" aria-label={showPassword ? "Hide password" : "Show password"}>
@@ -182,17 +188,11 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
 PasswordInput.displayName = "PasswordInput";
 
 import { useRouter } from "next/navigation";
-import { login, signup, resendVerification } from "@/lib/auth/actions";
+import { login, signup, resendVerification, forgotPassword } from "@/lib/auth/actions";
 
-function SignInForm() {
+function SignInForm({ setView }: { setView: (v: "signin" | "signup" | "forgot") => void }) {
     const router = useRouter();
     const [state, formAction] = useActionState(login, { success: false, message: "" });
-
-    useEffect(() => {
-        if (state.success) {
-            router.push("/dashboard/forms");
-        }
-    }, [state.success, router]);
 
     return (
         <form action={formAction} autoComplete="on" className="flex flex-col gap-8">
@@ -202,7 +202,14 @@ function SignInForm() {
             </div>
             <div className="grid gap-4">
                 <div className="grid gap-2"><Label htmlFor="email">Email</Label><Input id="email" name="email" type="email" placeholder="m@example.com" required autoComplete="email" /></div>
-                <PasswordInput name="password" label="Password" required autoComplete="current-password" placeholder="Password" />
+                <PasswordInput
+                    name="password"
+                    label="Password"
+                    labelDescription={<a href="#" onClick={(e) => { e.preventDefault(); setView("forgot"); }} className="ml-auto inline-block text-sm underline text-muted-foreground hover:text-foreground">Forgot your password?</a>}
+                    required
+                    autoComplete="current-password"
+                    placeholder="Password"
+                />
 
                 {state.message && (
                     <p className={cn("text-sm text-center font-medium", state.success ? "text-green-500" : "text-red-500")}>
@@ -216,7 +223,7 @@ function SignInForm() {
     );
 }
 
-function SignUpForm() {
+function SignUpForm({ setView }: { setView: (v: "signin" | "signup" | "forgot") => void }) {
     const [state, formAction] = useActionState(signup, { success: false, message: "" });
     const [resendState, resendAction] = useActionState(resendVerification, { success: false, message: "" });
     const [submittedEmail, setSubmittedEmail] = useState("");
@@ -281,13 +288,53 @@ function SignUpForm() {
     );
 }
 
-function AuthFormContainer({ isSignIn, onToggle }: { isSignIn: boolean; onToggle: () => void; }) {
+function ForgotPasswordForm({ setView }: { setView: (v: "signin" | "signup" | "forgot") => void }) {
+    const [state, formAction] = useActionState(forgotPassword, { success: false, message: "" });
+
+    return (
+        <form action={formAction} autoComplete="on" className="flex flex-col gap-8">
+            <div className="flex flex-col items-center gap-2 text-center">
+                <h1 className="text-2xl font-bold">Reset Password</h1>
+                <p className="text-balance text-sm text-muted-foreground">Enter your email to receive a reset link</p>
+            </div>
+            <div className="grid gap-4">
+                <div className="grid gap-2"><Label htmlFor="email">Email</Label><Input id="email" name="email" type="email" placeholder="m@example.com" required autoComplete="email" /></div>
+
+                {state.message && (
+                    <p className={cn("text-sm text-center font-medium", state.success ? "text-green-500" : "text-red-500")}>
+                        {state.message}
+                    </p>
+                )}
+
+                <Button type="submit" variant="default" className="mt-2 text-white dark:text-black">Send Reset Link</Button>
+            </div>
+
+            <div className="text-center text-sm">
+                <Button variant="link" className="pl-1 text-foreground" onClick={() => setView("signin")}>
+                    Back to login
+                </Button>
+            </div>
+        </form>
+    );
+}
+
+function AuthFormContainer({ view, setView }: { view: "signin" | "signup" | "forgot"; setView: (v: "signin" | "signup" | "forgot") => void; }) {
+    if (view === "forgot") {
+        return (
+            <div className="mx-auto grid w-[350px] gap-2">
+                <ForgotPasswordForm setView={setView} />
+            </div>
+        );
+    }
+
+    const isSignIn = view === "signin";
+
     return (
         <div className="mx-auto grid w-[350px] gap-2">
-            {isSignIn ? <SignInForm /> : <SignUpForm />}
+            {isSignIn ? <SignInForm setView={setView} /> : <SignUpForm setView={setView} />}
             <div className="text-center text-sm">
                 {isSignIn ? "Don't have an account?" : "Already have an account?"}{" "}
-                <Button variant="link" className="pl-1 text-foreground" onClick={onToggle}>
+                <Button variant="link" className="pl-1 text-foreground" onClick={() => setView(isSignIn ? "signup" : "signin")}>
                     {isSignIn ? "Sign up" : "Sign in"}
                 </Button>
             </div>
@@ -345,8 +392,7 @@ const defaultSignUpContent = {
 };
 
 export function AuthUI({ signInContent = {}, signUpContent = {} }: AuthUIProps) {
-    const [isSignIn, setIsSignIn] = useState(true);
-    const toggleForm = () => setIsSignIn((prev) => !prev);
+    const [view, setView] = useState<"signin" | "signup" | "forgot">("signin");
 
     const finalSignInContent = {
         image: { ...defaultSignInContent.image, ...signInContent.image },
@@ -357,7 +403,7 @@ export function AuthUI({ signInContent = {}, signUpContent = {} }: AuthUIProps) 
         quote: { ...defaultSignUpContent.quote, ...signUpContent.quote },
     };
 
-    const currentContent = isSignIn ? finalSignInContent : finalSignUpContent;
+    const currentContent = view !== "signup" ? finalSignInContent : finalSignUpContent;
 
     return (
         <div className="w-full min-h-screen md:grid md:grid-cols-2">
@@ -368,7 +414,7 @@ export function AuthUI({ signInContent = {}, signUpContent = {} }: AuthUIProps) 
         }
       `}</style>
             <div className="flex h-screen items-center justify-center p-6 md:h-auto md:p-0 md:py-12 bg-background">
-                <AuthFormContainer isSignIn={isSignIn} onToggle={toggleForm} />
+                <AuthFormContainer view={view} setView={setView} />
             </div>
 
             <BeamsBackground

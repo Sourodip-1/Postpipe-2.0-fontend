@@ -34,8 +34,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await fetch('/api/auth/me');
       if (res.ok) {
         const data = await res.json();
-        if (data.user) {
-          setUser(data.user);
+        if (data && data.email) {
+          setUser(data);
         } else {
           setUser(null);
           document.cookie = `${AUTH_COOKIE_NAME}=; path=/; max-age=-1`;

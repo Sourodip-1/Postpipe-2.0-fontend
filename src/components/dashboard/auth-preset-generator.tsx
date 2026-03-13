@@ -22,15 +22,23 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
     const [presetName, setPresetName] = React.useState(initialPreset?.name || "");
     const [isSaving, setIsSaving] = React.useState(false);
 
-    const [providers, setProviders] = React.useState(initialPreset?.providers || {
-        email: true,
-        google: false,
-        github: false
+    const [providers, setProviders] = React.useState({
+        email: initialPreset?.providers?.email ?? true,
+        google: initialPreset?.providers?.google ?? false,
+        github: initialPreset?.providers?.github ?? false
     });
+    const [requireEmailVerification, setRequireEmailVerification] = React.useState(initialPreset?.providers?.requireEmailVerification || false);
     const [redirectUrl, setRedirectUrl] = React.useState(initialPreset?.redirectUrl || "");
     const [projectId, setProjectId] = React.useState(initialPreset?.projectId || "");
     const [targetDatabase, setTargetDatabase] = React.useState(initialPreset?.targetDatabase || "default");
     const [apiUrl, setApiUrl] = React.useState(initialPreset?.apiUrl || "http://localhost:3002/api/auth");
+
+    // Email Provider and SMTP settings
+    const [emailProvider, setEmailProvider] = React.useState<"resend" | "nodemailer">(initialPreset?.providers?.emailProvider || "resend");
+    const [smtpHost, setSmtpHost] = React.useState(initialPreset?.providers?.smtpHost || "");
+    const [smtpPort, setSmtpPort] = React.useState(initialPreset?.providers?.smtpPort || "587");
+    const [smtpUser, setSmtpUser] = React.useState(initialPreset?.providers?.smtpUser || "");
+    const [smtpPass, setSmtpPass] = React.useState(initialPreset?.providers?.smtpPass || "");
 
     // Load connectors for database routing selection
     const [connectors, setConnectors] = React.useState<any[]>([]);
@@ -76,7 +84,7 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
         apiUrl: "${apiUrl}",
         projectId: "${projectId || 'YOUR_PROJECT_ID'}",
         providers: ${JSON.stringify(activeProviders)},
-        redirectUrl: "${redirectUrl || 'window.location.origin'}"${targetDatabase && targetDatabase !== 'default' ? `,\n        targetDatabase: "${targetDatabase}"` : ''}
+        redirectUrl: ${(!redirectUrl || redirectUrl === 'window.location.origin') ? 'window.location.origin' : `"${redirectUrl}"`}${targetDatabase && targetDatabase !== 'default' ? `,\n        targetDatabase: "${targetDatabase}"` : ''}
     });
 
     // Handle Auth Events
@@ -94,6 +102,15 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
     const copyToClipboard = () => {
         navigator.clipboard.writeText(generateSnippet());
         toast({ title: "Copied!", description: "Auth snippet copied to clipboard." });
+
+        if (providers.email && requireEmailVerification) {
+            setTimeout(() => {
+                toast({
+                    title: "Action Required",
+                    description: "Remember to set RESEND_API_KEY in your connector's .env to enable verification emails.",
+                });
+            }, 300);
+        }
     };
 
     const handleSave = async () => {
@@ -115,7 +132,15 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
             formData.append("projectId", projectId);
             formData.append("redirectUrl", redirectUrl);
             formData.append("apiUrl", apiUrl);
-            formData.append("providers", JSON.stringify(providers));
+            formData.append("providers", JSON.stringify({
+                ...providers,
+                requireEmailVerification,
+                emailProvider,
+                smtpHost,
+                smtpPort,
+                smtpUser,
+                smtpPass
+            }));
 
             let res;
             if (initialPreset) {
@@ -150,6 +175,63 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
                         <p className="text-sm text-muted-foreground mt-1">
                             Generate plug-and-play authentication bound directly to your connected Postpipe databases.
                         </p>
+                    </div>
+
+                    <div className="bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900 rounded-xl p-4 flex gap-3 text-orange-800 dark:text-orange-300 text-sm">
+                        <AlertCircle className="h-5 w-5 shrink-0" />
+                        <div>
+                            <p className="font-semibold mb-1">Deployment Checklist:</p>
+                            <ul className="list-disc pl-5 space-y-1">
+                                <li>Make sure your remote Postpipe Connector is running and updated.</li>
+                                <li className="mt-2">
+                                    <strong>Connector Configuration Required:</strong> Add these to your Connector's <code>.env</code> file:
+                                    <div className="mt-2 bg-orange-100/50 dark:bg-orange-950/50 p-3 rounded-md text-xs font-mono space-y-1 border border-orange-200/50 dark:border-orange-900/50 overflow-x-auto selection:bg-orange-200 dark:selection:bg-orange-900 text-orange-900 dark:text-orange-200">
+                                        <div className="text-orange-900/50 dark:text-orange-200/50"># Core Auth Settings</div>
+                                        <div>CONNECTOR_SECRET="<span className="opacity-50">your-super-secret-jwt-key</span>"</div>
+
+                                        {providers.google && (
+                                            <>
+                                                <div className="text-orange-900/50 dark:text-orange-200/50 mt-2"># Google OAuth</div>
+                                                <div>GOOGLE_CLIENT_ID="<span className="opacity-50">your-google-client-id</span>"</div>
+                                                <div>GOOGLE_CLIENT_SECRET="<span className="opacity-50">your-google-client-secret</span>"</div>
+                                            </>
+                                        )}
+
+                                        {providers.github && (
+                                            <>
+                                                <div className="text-orange-900/50 dark:text-orange-200/50 mt-2"># GitHub OAuth</div>
+                                                <div>GITHUB_CLIENT_ID="<span className="opacity-50">your-github-client-id</span>"</div>
+                                                <div>GITHUB_CLIENT_SECRET="<span className="opacity-50">your-github-client-secret</span>"</div>
+                                            </>
+                                        )}
+
+                                        {providers.email && requireEmailVerification && (
+                                            <>
+                                                <div className="text-orange-900/50 dark:text-orange-200/50 mt-2"># Email Provider Choice</div>
+                                                <div>EMAIL_PROVIDER="{emailProvider}"</div>
+
+                                                {emailProvider === 'resend' ? (
+                                                    <>
+                                                        <div className="text-orange-900/50 dark:text-orange-200/50 mt-2"># Resend Verification</div>
+                                                        <div>RESEND_API_KEY="<span className="opacity-50">your-resend-api-key</span>"</div>
+                                                        <div>RESEND_FROM_EMAIL="<span className="opacity-50">onboarding@resend.dev</span>"</div>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <div className="text-orange-900/50 dark:text-orange-200/50 mt-2"># Nodemailer (SMTP)</div>
+                                                        <div>SMTP_HOST="{smtpHost || '<span className="opacity-50">smtp.example.com</span>'}"</div>
+                                                        <div>SMTP_PORT="{smtpPort || '587'}"</div>
+                                                        <div>SMTP_USER="{smtpUser || '<span className="opacity-50">user@example.com</span>'}"</div>
+                                                        <div>SMTP_PASS="{smtpPass || '<span className="opacity-50">your-password</span>'}"</div>
+                                                        <div>SMTP_SECURE="{smtpPort === '465' ? 'true' : 'false'}"</div>
+                                                    </>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
 
                     <div className="space-y-4 pt-4 border-t">
@@ -193,6 +275,69 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
                                 <span className="text-sm font-medium">GitHub OAuth</span>
                             </label>
                         </div>
+
+                        {providers.email && (
+                            <div className="mt-4 p-4 rounded-lg border bg-card shadow-sm space-y-4">
+                                <h3 className="text-sm font-medium">Security & Verification</h3>
+                                <label className="flex items-start gap-3 cursor-pointer">
+                                    <Checkbox
+                                        checked={requireEmailVerification}
+                                        onCheckedChange={(checked) => setRequireEmailVerification(!!checked)}
+                                        className="mt-1"
+                                    />
+                                    <div>
+                                        <p className="text-sm font-medium">Require Email Verification</p>
+                                        <p className="text-xs text-muted-foreground mt-0.5">
+                                            Users must verify their email address before they can log in.
+                                        </p>
+                                    </div>
+                                </label>
+
+                                {requireEmailVerification && (
+                                    <div className="space-y-4 pt-4 border-t">
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Email Provider</label>
+                                            <Select value={emailProvider} onValueChange={(val: any) => setEmailProvider(val)}>
+                                                <SelectTrigger className="h-9">
+                                                    <SelectValue placeholder="Select provider" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="resend">Resend (API)</SelectItem>
+                                                    <SelectItem value="nodemailer">Nodemailer (SMTP)</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        {emailProvider === 'nodemailer' && (
+                                            <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-bold text-muted-foreground uppercase">SMTP Host</label>
+                                                    <Input size={32} className="h-8 text-xs" placeholder="smtp.gmail.com" value={smtpHost} onChange={e => setSmtpHost(e.target.value)} />
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-bold text-muted-foreground uppercase">SMTP Port</label>
+                                                    <Input size={32} className="h-8 text-xs" placeholder="587" value={smtpPort} onChange={e => setSmtpPort(e.target.value)} />
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Username</label>
+                                                    <Input size={32} className="h-8 text-xs" placeholder="user@gmail.com" value={smtpUser} onChange={e => setSmtpUser(e.target.value)} />
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-bold text-muted-foreground uppercase">Password</label>
+                                                    <Input size={32} type="password" className="h-8 text-xs" placeholder="••••••••" value={smtpPass} onChange={e => setSmtpPass(e.target.value)} />
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {emailProvider === 'resend' && (
+                                            <div className="p-3 rounded-lg border border-blue-500/20 bg-blue-500/5 text-xs text-blue-600 dark:text-blue-400">
+                                                <p>Requires <strong>RESEND_API_KEY</strong> in your connector's .env file.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     <div className="space-y-4 pt-4 border-t">
@@ -261,40 +406,6 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
                         </div>
                     </div>
                 </div>
-
-                <div className="bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900 rounded-xl p-4 flex gap-3 text-orange-800 dark:text-orange-300 text-sm">
-                    <AlertCircle className="h-5 w-5 shrink-0" />
-                    <div>
-                        <p className="font-semibold mb-1">Before deploying to production:</p>
-                        <ul className="list-disc pl-5 space-y-1">
-                            <li>Make sure your remote Postpipe Connector is running and updated to support Auth routes (<code>/api/auth/*</code>).</li>
-                            <li className="mt-2">
-                                <strong>Backend Configuration Required:</strong> Add these environment variables to your deployment environment (e.g., Connector's <code>.env</code> file):
-                                <div className="mt-2 bg-orange-100/50 dark:bg-orange-950/50 p-3 rounded-md text-xs font-mono space-y-1 border border-orange-200/50 dark:border-orange-900/50 overflow-x-auto selection:bg-orange-200 dark:selection:bg-orange-900 text-orange-900 dark:text-orange-200">
-                                    <div className="text-orange-900/50 dark:text-orange-200/50"># Core Auth Settings</div>
-                                    <div>JWT_SECRET="<span className="opacity-50">your-super-secret-jwt-key</span>"</div>
-                                    <div>NEXTAUTH_URL="<span className="opacity-50">{redirectUrl || 'https://your-deployment-url.com'}</span>"</div>
-
-                                    {providers.google && (
-                                        <>
-                                            <div className="text-orange-900/50 dark:text-orange-200/50 mt-2"># Google OAuth</div>
-                                            <div>GOOGLE_CLIENT_ID="<span className="opacity-50">your-google-client-id</span>"</div>
-                                            <div>GOOGLE_CLIENT_SECRET="<span className="opacity-50">your-google-client-secret</span>"</div>
-                                        </>
-                                    )}
-
-                                    {providers.github && (
-                                        <>
-                                            <div className="text-orange-900/50 dark:text-orange-200/50 mt-2"># GitHub OAuth</div>
-                                            <div>GITHUB_CLIENT_ID="<span className="opacity-50">your-github-client-id</span>"</div>
-                                            <div>GITHUB_CLIENT_SECRET="<span className="opacity-50">your-github-client-secret</span>"</div>
-                                        </>
-                                    )}
-                                </div>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
             </div>
 
             {/* Snippet Preview Panel */}
@@ -326,18 +437,18 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
                             <span className="text-[#89B4FA]">&lt;script</span> <span className="text-[#F38BA8]">src</span>=<span className="text-[#A6E3A1]">"{`${window.location.origin}/api/public/cdn/auth.js${projectId ? `?projectId=${projectId}` : ''}`}"</span><span className="text-[#89B4FA]">&gt;&lt;/script&gt;</span>
                             {'\n\n'}
                             <span className="text-[#89B4FA]">&lt;script&gt;</span>{'\n'}
-                            <span className="text-[#CBA6F7]">PostpipeAuth</span>.<span className="text-[#89B4FA]">init</span>({`{`}{'\n'}
-                            <span className="text-[#89B4FA]">apiUrl</span>: <span className="text-[#A6E3A1]">"{apiUrl}"</span>,{'\n'}
-                            <span className="text-[#89B4FA]">projectId</span>: <span className="text-[#A6E3A1]">"{projectId || 'YOUR_PROJECT_ID'}"</span>,{'\n'}
-                            <span className="text-[#89B4FA]">providers</span>: <span className="text-[#F9E2AF]">{JSON.stringify(Object.keys(providers).filter(k => providers[k as keyof typeof providers]))}</span>,{'\n'}
-                            <span className="text-[#89B4FA]">redirectUrl</span>: <span className="text-[#A6E3A1]">"{redirectUrl || 'window.location.origin'}"</span>{targetDatabase && targetDatabase !== 'default' ? `,\n        <span className="text-[#89B4FA]">targetDatabase</span>: <span className="text-[#A6E3A1]">"${targetDatabase}"</span>` : ''}{'\n'}
+                            <span className="text-[#89B4FA]">PostpipeAuth</span>.<span className="text-[#89B4FA]">init</span>({`{`}{'\n'}
+                            <span className="text-[#89B4FA]">    apiUrl</span>: <span className="text-[#A6E3A1]">"{apiUrl}"</span>,{'\n'}
+                            <span className="text-[#89B4FA]">    projectId</span>: <span className="text-[#A6E3A1]">"{projectId || 'YOUR_PROJECT_ID'}"</span>,{'\n'}
+                            <span className="text-[#89B4FA]">    providers</span>: <span className="text-[#F9E2AF]">{JSON.stringify(Object.keys(providers).filter(k => providers[k as keyof typeof providers]))}</span>,{'\n'}
+                            <span className="text-[#89B4FA]">    redirectUrl</span>: {redirectUrl ? <span className="text-[#A6E3A1]">"{redirectUrl}"</span> : <span className="text-[#F9E2AF]">window.location.href</span>}{targetDatabase && targetDatabase !== 'default' ? `,\n<span className="text-[#89B4FA]">    targetDatabase</span>: <span className="text-[#A6E3A1]">"${targetDatabase}"</span>` : ''}{'\n'}
                             {`}`});{'\n\n'}
                             <span className="text-[#7EE787]">// Handle Auth Events</span>{'\n'}
-                            <span className="text-[#CBA6F7]">PostpipeAuth</span>.<span className="text-[#89B4FA]">on</span>(<span className="text-[#A6E3A1]">"success"</span>, (<span className="text-[#F38BA8]">user</span>) <span className="text-[#CBA6F7]">=&gt;</span> {`{`}{'\n'}
-                            <span className="text-[#89B4FA]">console</span>.<span className="text-[#89B4FA]">log</span>(<span className="text-[#A6E3A1]">"Authenticated User:"</span>, user);{'\n'}
+                            <span className="text-[#89B4FA]">PostpipeAuth</span>.<span className="text-[#89B4FA]">on</span>(<span className="text-[#A6E3A1]">"success"</span>, (<span className="text-[#F38BA8]">user</span>) <span className="text-[#CBA6F7]">=&gt;</span> {`{`}{'\n'}
+                            <span className="text-[#89B4FA]">    console</span>.<span className="text-[#89B4FA]">log</span>(<span className="text-[#A6E3A1]">"Authenticated User:"</span>, user);{'\n'}
                             {`}`});{'\n\n'}
-                            <span className="text-[#CBA6F7]">PostpipeAuth</span>.<span className="text-[#89B4FA]">on</span>(<span className="text-[#A6E3A1]">"error"</span>, (<span className="text-[#F38BA8]">error</span>) <span className="text-[#CBA6F7]">=&gt;</span> {`{`}{'\n'}
-                            <span className="text-[#89B4FA]">console</span>.<span className="text-[#89B4FA]">error</span>(<span className="text-[#A6E3A1]">"Authentication Error:"</span>, error);{'\n'}
+                            <span className="text-[#89B4FA]">PostpipeAuth</span>.<span className="text-[#89B4FA]">on</span>(<span className="text-[#A6E3A1]">"error"</span>, (<span className="text-[#F38BA8]">error</span>) <span className="text-[#CBA6F7]">=&gt;</span> {`{`}{'\n'}
+                            <span className="text-[#89B4FA]">    console</span>.<span className="text-[#89B4FA]">error</span>(<span className="text-[#A6E3A1]">"Authentication Error:"</span>, error);{'\n'}
                             {`}`});{'\n'}
                             <span className="text-[#89B4FA]">&lt;/script&gt;</span>
                         </code>

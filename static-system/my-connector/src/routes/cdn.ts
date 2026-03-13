@@ -19,39 +19,30 @@ router.get('/auth.js', (req: Request, res: Response) => {
                 projectId: null,
                 providers: ['email'],
                 redirectUrl: window.location.origin,
-                apiUrl: '${req.protocol}://${req.get('host')}/api/auth' // Fallback to local during dev, should be dynamic in prod based on connector mapping
+                apiUrl: '${req.protocol}://${req.get('host')}/api/auth'
             };
-            this.listeners = {
-                success: [],
-                error: []
-            };
+            this.listeners = { success: [], error: [] };
             this.isInitialized = false;
+            this._mode = 'login'; // 'login' | 'register' | 'otp'
+            this._pendingEmail = '';
         }
 
         init(userConfig) {
             this.config = { ...this.config, ...userConfig };
             this.isInitialized = true;
-            console.log("[PostPipe Auth] Initialized with config:", this.config);
-            
-            // Check for OAuth callbacks in URL
             this.checkOAuthCallback();
-            
-            // Render UI if container exists
+            this.checkVerificationAction();
             if (document.getElementById('postpipe-auth')) {
                 this.render();
             }
         }
 
         on(event, callback) {
-            if (this.listeners[event]) {
-                this.listeners[event].push(callback);
-            }
+            if (this.listeners[event]) this.listeners[event].push(callback);
         }
 
         emit(event, data) {
-            if (this.listeners[event]) {
-                this.listeners[event].forEach(cb => cb(data));
-            }
+            if (this.listeners[event]) this.listeners[event].forEach(cb => cb(data));
         }
 
         async loginWithEmail(email, password) {
@@ -60,25 +51,22 @@ router.get('/auth.js', (req: Request, res: Response) => {
                 const response = await fetch(\`\${this.config.apiUrl}/login\`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        email, password, 
-                        projectId: this.config.projectId, 
-                        targetDatabase: this.config.targetDatabase 
-                    })
+                    body: JSON.stringify({ email, password, projectId: this.config.projectId, targetDatabase: this.config.targetDatabase })
                 });
-
                 const data = await response.json();
                 
+                if (response.status === 403 && data.requiresOtp) {
+                    this._pendingEmail = email;
+                    this._mode = 'otp';
+                    return this.render(data.message, 'success');
+                }
+
                 if (!response.ok) throw new Error(data.message || 'Login failed');
-                
                 this.emit('success', data.user);
                 this.setAuthToken(data.token);
-                
-                if (this.config.redirectUrl) {
-                    window.location.href = this.config.redirectUrl;
-                }
+                if (this.config.redirectUrl) window.location.href = this.config.redirectUrl;
             } catch (err) {
-                this.showError(err.message);
+                this.showMessage(err.message, 'error');
                 this.emit('error', err);
             } finally {
                 this.setLoading(false);
@@ -91,218 +79,317 @@ router.get('/auth.js', (req: Request, res: Response) => {
                 const response = await fetch(\`\${this.config.apiUrl}/register\`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        name, email, password, 
-                        projectId: this.config.projectId, 
-                        targetDatabase: this.config.targetDatabase 
-                    })
+                    body: JSON.stringify({ name, email, password, projectId: this.config.projectId, targetDatabase: this.config.targetDatabase })
                 });
-
                 const data = await response.json();
                 
+                if (response.status === 201 && data.requiresOtp) {
+                    this._pendingEmail = email;
+                    this._mode = 'otp';
+                    return this.render(data.message, 'success');
+                }
+
                 if (!response.ok) throw new Error(data.message || 'Registration failed');
-                
                 this.emit('success', data.user);
                 this.setAuthToken(data.token);
-                
-                if (this.config.redirectUrl) {
-                    window.location.href = this.config.redirectUrl;
-                }
+                if (this.config.redirectUrl) window.location.href = this.config.redirectUrl;
             } catch (err) {
-                this.showError(err.message);
+                this.showMessage(err.message, 'error');
                 this.emit('error', err);
             } finally {
                 this.setLoading(false);
             }
         }
 
+        async verifyOtp() {
+            const otp = document.getElementById('pp-otp')?.value;
+            if (!otp || otp.length !== 6) return this.showMessage('Enter a valid 6-digit code.', 'error');
+
+            try {
+                this.setLoading(true);
+                const response = await fetch(\`\${this.config.apiUrl}/verify-otp\`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: this._pendingEmail, otp, targetDatabase: this.config.targetDatabase })
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.message || 'Verification failed');
+
+                this.setAuthToken(data.token);
+                this.emit('success', data.user);
+                if (this.config.redirectUrl) {
+                    window.location.href = this.config.redirectUrl;
+                } else {
+                    this._mode = 'login';
+                    this.render('Email verified successfully! You can now sign in.', 'success');
+                }
+            } catch (err) {
+                this.showMessage(err.message, 'error');
+            } finally {
+                this.setLoading(false);
+            }
+        }
+
+        async resendOtp() {
+            try {
+                this.setLoading(true);
+                const response = await fetch(\`\${this.config.apiUrl}/resend-otp\`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: this._pendingEmail, targetDatabase: this.config.targetDatabase })
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.message);
+                this.showMessage('New code sent to your email!', 'success');
+            } catch (err) {
+                this.showMessage(err.message, 'error');
+            } finally {
+                this.setLoading(false);
+            }
+        }
+
         loginWithOAuth(provider) {
-            // Redirects user to the connector's OAuth initiation route
             const oauthUrl = \`\${this.config.apiUrl}/\${provider}?projectId=\${this.config.projectId || ''}&targetDatabase=\${this.config.targetDatabase || ''}&redirect=\${encodeURIComponent(window.location.href)}\`;
             window.location.href = oauthUrl;
+        }
+
+        async checkVerificationAction() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const action = urlParams.get('pp_action');
+            const token = urlParams.get('token');
+            if (action === 'verify-email' && token) {
+                try {
+                    this.renderVerificationOverlay("Verifying your email...");
+                    const response = await fetch(\`\${this.config.apiUrl}/verify-email\`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ token, targetDatabase: this.config.targetDatabase })
+                    });
+                    const data = await response.json();
+                    if (!response.ok) throw new Error(data.message || 'Verification failed');
+                    this.renderVerificationOverlay("Email Verified Successfully!", true);
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete('pp_action');
+                    url.searchParams.delete('token');
+                    window.history.replaceState({}, document.title, url.toString());
+                    setTimeout(() => { this._mode = 'login'; this.render(); }, 2000);
+                } catch (err) {
+                    this.renderVerificationOverlay(\`Verification Failed: \${err.message}\`, false, true);
+                }
+            }
+        }
+
+        renderVerificationOverlay(message, isSuccess = false, isError = false) {
+            const container = document.getElementById('postpipe-auth');
+            if (!container) return;
+            container.innerHTML = \`
+                <div style="text-align: center; padding: 40px 20px;">
+                    <div style="margin-bottom: 20px;">
+                        \${isSuccess ? 
+                            '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>' : 
+                            isError ? 
+                            '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>' : 
+                            '<span class="pp-spinner" style="width: 32px; height: 32px; border-width: 3px; border-top-color: #0f172a; margin: 0 auto; display: block;"></span>'
+                        }
+                    </div>
+                    <h3 style="font-size: 18px; font-weight: 600; color: #111; margin: 0 0 8px 0;">\${message}</h3>
+                    <p style="font-size: 14px; color: #666; margin: 0;">\${isSuccess ? 'You can now sign in to your account.' : isError ? 'Please try again or contact support.' : 'This will only take a moment.'}</p>
+                    \${isError ? '<button onclick="location.reload()" class="pp-btn pp-btn-primary" style="margin-top: 20px;">Try Again</button>' : ''}
+                </div>
+            \`;
         }
 
         checkOAuthCallback() {
             const urlParams = new URLSearchParams(window.location.search);
             const token = urlParams.get('pp_token');
             const error = urlParams.get('pp_error');
-
             if (token) {
                 this.setAuthToken(token);
-                // Clean URL
                 window.history.replaceState({}, document.title, window.location.pathname);
-                // Decode token to get user info (simplified)
                 try {
                     const payload = JSON.parse(atob(token.split('.')[1]));
                     this.emit('success', payload);
-                } catch(e) {
-                    console.error("Failed to parse token payload");
-                }
+                } catch(e) { console.error("Failed to parse token payload"); }
             } else if (error) {
                 this.emit('error', new Error(decodeURIComponent(error)));
-                this.showError(decodeURIComponent(error));
+                this.showMessage(decodeURIComponent(error), 'error');
             }
         }
 
         setAuthToken(token) {
-            // Store securely (localStorage for now, but HTTP-only cookies are preferred in the backend)
             localStorage.setItem(\`pp_auth_\${this.config.projectId}\`, token);
         }
 
         logout() {
             localStorage.removeItem(\`pp_auth_\${this.config.projectId}\`);
             fetch(\`\${this.config.apiUrl}/logout\`, { method: 'POST' }).catch(() => {});
-            this.emit('success', null); // Logged out
+            this.emit('success', null);
         }
 
-        // --- UI Rendering ---
-        
         setLoading(isLoading) {
             const btn = document.getElementById('pp-submit-btn');
             if (btn) {
                 btn.disabled = isLoading;
-                btn.innerHTML = isLoading ? '<span class="pp-spinner"></span> Processing...' : this._isRegisterMode ? 'Sign Up' : 'Sign In';
+                btn.innerHTML = isLoading ? '<span class="pp-spinner"></span> Processing...' : 
+                    this._mode === 'register' ? 'Sign Up' : 
+                    this._mode === 'otp' ? 'Verify & Sign In' : 'Sign In';
             }
         }
 
-        showError(msg) {
+        showMessage(msg, type = 'error') {
             const errDiv = document.getElementById('pp-error');
             if (errDiv) {
                 errDiv.innerText = msg;
                 errDiv.style.display = 'block';
+                if (type === 'success') {
+                    errDiv.style.background = '#dcfce7';
+                    errDiv.style.color = '#166534';
+                    errDiv.style.borderColor = '#bbf7d0';
+                } else {
+                    errDiv.style.background = '#fee2e2';
+                    errDiv.style.color = '#ef4444';
+                    errDiv.style.borderColor = '#fca5a5';
+                }
             }
         }
 
         toggleMode() {
-            this._isRegisterMode = !this._isRegisterMode;
+            this._mode = this._mode === 'login' ? 'register' : 'login';
             this.render();
         }
 
-        render() {
+        render(message, messageType = 'error') {
             const container = document.getElementById('postpipe-auth');
             if (!container) return;
 
-            // Inject CSS
             if (!document.getElementById('pp-auth-styles')) {
                 const style = document.createElement('style');
                 style.id = 'pp-auth-styles';
                 style.innerHTML = \`
-                    #postpipe-auth { font-family: system-ui, -apple-system, sans-serif; max-width: 400px; margin: 0 auto; padding: 24px; background: #fff; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); border: 1px solid #eaeaea; }
-                    .pp-title { font-size: 20px; font-weight: 600; text-align: center; margin: 0 0 20px 0; color: #111; }
-                    .pp-input-group { margin-bottom: 16px; }
-                    .pp-input-group label { display: block; font-size: 13px; font-weight: 500; color: #555; margin-bottom: 6px; }
-                    .pp-input { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; transition: border-color 0.2s; }
-                    .pp-input:focus { outline: none; border-color: #0ea5e9; }
-                    .pp-btn { width: 100%; padding: 10px; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; transition: opacity 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+                    #postpipe-auth { font-family: 'Inter', system-ui, -apple-system, sans-serif; max-width: 420px; margin: 0 auto; padding: 32px; background: #fff; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.08); border: 1px solid #f0f0f0; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+                    .pp-title { font-size: 24px; font-weight: 700; text-align: center; margin: 0 0 8px 0; color: #0f172a; letter-spacing: -0.025em; }
+                    .pp-subtitle { font-size: 14px; color: #64748b; text-align: center; margin-bottom: 28px; }
+                    .pp-input-group { margin-bottom: 20px; }
+                    .pp-input-group label { display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.025em; }
+                    .pp-input { width: 100%; box-sizing: border-box; padding: 12px 16px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-size: 15px; transition: all 0.2s; background: #f8fafc; }
+                    .pp-input:focus { outline: none; border-color: #4f46e5; background: #fff; box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1); }
+                    .pp-btn { width: 100%; padding: 12px; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 10px; }
                     .pp-btn:disabled { opacity: 0.7; cursor: not-allowed; }
-                    .pp-btn-primary { background: #0f172a; color: #fff; }
-                    .pp-btn-primary:hover { opacity: 0.9; }
-                    .pp-btn-oauth { background: #fff; color: #333; border: 1px solid #ddd; margin-bottom: 12px; }
-                    .pp-btn-oauth:hover { background: #f9f9f9; }
-                    .pp-divider { display: flex; align-items: center; text-align: center; margin: 20px 0; color: #888; font-size: 13px; }
-                    .pp-divider::before, .pp-divider::after { content: ''; flex: 1; border-bottom: 1px solid #eee; }
-                    .pp-divider:not(:empty)::before { margin-right: .25em; }
-                    .pp-divider:not(:empty)::after { margin-left: .25em; }
-                    .pp-error { color: #ef4444; background: #fee2e2; border: 1px solid #fca5a5; padding: 10px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; display: none; }
-                    .pp-toggle-mode { text-align: center; font-size: 13px; margin-top: 20px; color: #555; }
-                    .pp-toggle-mode a { color: #0ea5e9; text-decoration: none; cursor: pointer; font-weight: 500; }
+                    .pp-btn-primary { background: #4f46e5; color: #fff; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2); }
+                    .pp-btn-primary:hover { background: #4338ca; transform: translateY(-1px); box-shadow: 0 6px 16px rgba(79, 70, 229, 0.25); }
+                    .pp-btn-oauth { background: #fff; color: #1e293b; border: 1.5px solid #e2e8f0; margin-bottom: 12px; }
+                    .pp-btn-oauth:hover { background: #f1f5f9; border-color: #cbd5e1; }
+                    .pp-divider { display: flex; align-items: center; text-align: center; margin: 24px 0; color: #94a3b8; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+                    .pp-divider::before, .pp-divider::after { content: ''; flex: 1; border-bottom: 1px solid #e2e8f0; }
+                    .pp-divider:not(:empty)::before { margin-right: 1.5em; }
+                    .pp-divider:not(:empty)::after { margin-left: 1.5em; }
+                    .pp-error { padding: 12px 16px; border-radius: 10px; font-size: 14px; margin-bottom: 20px; display: none; border: 1.5px solid transparent; font-weight: 500; text-align: center; }
+                    .pp-toggle-mode { text-align: center; font-size: 14px; margin-top: 24px; color: #64748b; }
+                    .pp-toggle-mode a { color: #4f46e5; text-decoration: none; cursor: pointer; font-weight: 600; }
                     .pp-toggle-mode a:hover { text-decoration: underline; }
-                    .pp-spinner { border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top: 2px solid #fff; width: 14px; height: 14px; animation: pp-spin 1s linear infinite; }
+                    .pp-spinner { border: 2.5px solid rgba(255,255,255,0.3); border-radius: 50%; border-top: 2.5px solid #fff; width: 16px; height: 16px; animation: pp-spin 0.8s linear infinite; }
                     @keyframes pp-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
                 \`;
                 document.head.appendChild(style);
             }
 
-            this._isRegisterMode = this._isRegisterMode || false;
-            
             const hasEmail = this.config.providers.includes('email');
             const hasGoogle = this.config.providers.includes('google');
             const hasGithub = this.config.providers.includes('github');
 
-            let html = \`<h2 class="pp-title">\${this._isRegisterMode ? 'Create an Account' : 'Welcome Back'}</h2>\`;
-            
-            html += \`<div id="pp-error" class="pp-error"></div>\`;
+            if (this._mode === 'otp') {
+                container.innerHTML = \`
+                    <h2 class="pp-title">Verify Your Email</h2>
+                    <p class="pp-subtitle">We've sent a 6-digit code to your inbox</p>
+                    <div id="pp-error" class="pp-error"></div>
+                    <div class="pp-input-group">
+                        <label>Verification Code</label>
+                        <input type="text" id="pp-otp" class="pp-input" placeholder="000000" maxlength="6" style="text-align: center; letter-spacing: 8px; font-size: 24px; font-weight: bold; color: #4f46e5;" autofocus />
+                    </div>
+                    <button type="button" id="pp-submit-btn" class="pp-btn pp-btn-primary" onclick="PostpipeAuth.verifyOtp()">
+                        Verify & Sign In
+                    </button>
+                    <div class="pp-toggle-mode">
+                        Didn't get a code? <a onclick="PostpipeAuth.resendOtp()">Resend Code</a>
+                    </div>
+                    <div class="pp-toggle-mode" style="margin-top: 10px;">
+                        <a onclick="PostpipeAuth._mode='login';PostpipeAuth.render()">Back to Sign In</a>
+                    </div>
+                \`;
+            } else {
+                let html = \`<h2 class="pp-title">\${this._mode === 'register' ? 'Create Account' : 'Welcome Back'}</h2>\`;
+                html += \`<p class="pp-subtitle">\${this._mode === 'register' ? 'Start building something amazing' : 'Sign in to your account to continue'}</p>\`;
+                html += \`<div id="pp-error" class="pp-error"></div>\`;
 
-            if (hasGoogle) {
-                html += \`<button type="button" onclick="PostpipeAuth.loginWithOAuth('google')" class="pp-btn pp-btn-oauth">
-                    <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/><path fill="none" d="M1 1h22v22H1z"/></svg>
-                    Continue with Google
-                </button>\`;
-            }
+                if (hasGoogle) {
+                    html += \`<button type="button" onclick="PostpipeAuth.loginWithOAuth('google')" class="pp-btn pp-btn-oauth">
+                        <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/><path fill="none" d="M1 1h22v22H1z"/></svg>
+                        Continue with Google
+                    </button>\`;
+                }
 
-            if (hasGithub) {
-                html += \`<button type="button" onclick="PostpipeAuth.loginWithOAuth('github')" class="pp-btn pp-btn-oauth">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#333"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-                    Continue with GitHub
-                </button>\`;
-            }
+                if (hasGithub) {
+                    html += \`<button type="button" onclick="PostpipeAuth.loginWithOAuth('github')" class="pp-btn pp-btn-oauth">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="#1e293b"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                        Continue with GitHub
+                    </button>\`;
+                }
 
-            if ((hasGoogle || hasGithub) && hasEmail) {
-                html += \`<div class="pp-divider">or</div>\`;
-            }
+                if ((hasGoogle || hasGithub) && hasEmail) {
+                    html += \`<div class="pp-divider">or</div>\`;
+                }
 
-            if (hasEmail) {
-                if (this._isRegisterMode) {
+                if (hasEmail) {
+                    if (this._mode === 'register') {
+                        html += \`
+                            <div class="pp-input-group">
+                                <label>Full Name</label>
+                                <input type="text" id="pp-name" class="pp-input" placeholder="Jane Doe" required />
+                            </div>
+                        \`;
+                    }
                     html += \`
                         <div class="pp-input-group">
-                            <label>Full Name</label>
-                            <input type="text" id="pp-name" class="pp-input" placeholder="Jane Doe" required />
+                            <label>Email Address</label>
+                            <input type="email" id="pp-email" class="pp-input" placeholder="you@example.com" required />
+                        </div>
+                        <div class="pp-input-group">
+                            <label>Password</label>
+                            <input type="password" id="pp-password" class="pp-input" placeholder="••••••••" required />
+                        </div>
+                        <button type="button" id="pp-submit-btn" class="pp-btn pp-btn-primary" onclick="PostpipeAuth._handleFormSubmit()">
+                            \${this._mode === 'register' ? 'Sign Up' : 'Sign In'}
+                        </button>
+                        <div class="pp-toggle-mode">
+                            \${this._mode === 'register' ? 'Already have an account? <a onclick="PostpipeAuth.toggleMode()">Sign In</a>' : 'Need an account? <a onclick="PostpipeAuth.toggleMode()">Create one</a>'}
                         </div>
                     \`;
                 }
-                
-                html += \`
-                    <div class="pp-input-group">
-                        <label>Email Address</label>
-                        <input type="email" id="pp-email" class="pp-input" placeholder="you@example.com" required />
-                    </div>
-                    <div class="pp-input-group">
-                        <label>Password</label>
-                        <input type="password" id="pp-password" class="pp-input" placeholder="••••••••" required />
-                    </div>
-                    <button type="button" id="pp-submit-btn" class="pp-btn pp-btn-primary" onclick="PostpipeAuth._handleFormSubmit()">
-                        \${this._isRegisterMode ? 'Sign Up' : 'Sign In'}
-                    </button>
-                    
-                    <div class="pp-toggle-mode">
-                        \${this._isRegisterMode ? 
-                            'Already have an account? <a onclick="PostpipeAuth.toggleMode()">Sign In</a>' : 
-                            'Need an account? <a onclick="PostpipeAuth.toggleMode()">Create one</a>'
-                        }
-                    </div>
-                \`;
+                container.innerHTML = html;
             }
 
-            container.innerHTML = html;
+            if (message) this.showMessage(message, messageType);
         }
 
         _handleFormSubmit() {
             const email = document.getElementById('pp-email')?.value;
             const password = document.getElementById('pp-password')?.value;
-            
-            if (!email || !password) {
-                this.showError('Please fill in all fields.');
-                return;
-            }
-
-            if (this._isRegisterMode) {
+            if (!email || !password) return this.showMessage('Please fill in all fields.', 'error');
+            if (this._mode === 'register') {
                 const name = document.getElementById('pp-name')?.value;
-                if (!name) return this.showError('Name is required.');
+                if (!name) return this.showMessage('Name is required.', 'error');
                 this.registerWithEmail(name, email, password);
             } else {
                 this.loginWithEmail(email, password);
             }
         }
     }
-
-    // Expose Global Instance
     global.PostpipeAuth = new PostpipeAuthClient();
-
 })(window);
 `;
 
     res.setHeader('Content-Type', 'application/javascript');
-    res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.status(200).send(authJsCode);
 });
 

@@ -61,6 +61,8 @@ export async function signup(prevState: any, formData: FormData): Promise<AuthSt
     }
 }
 
+import { redirect } from 'next/navigation';
+
 export async function login(prevState: any, formData: FormData): Promise<AuthState> {
     const rawData = Object.fromEntries(formData.entries());
     const validated = LoginSchema.safeParse(rawData);
@@ -70,6 +72,7 @@ export async function login(prevState: any, formData: FormData): Promise<AuthSta
     }
 
     const { email, password } = validated.data;
+    let loginSuccess = false;
 
     try {
         await dbConnect();
@@ -93,23 +96,31 @@ export async function login(prevState: any, formData: FormData): Promise<AuthSta
         (await cookies()).set('token', token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
             maxAge: 7 * 24 * 60 * 60 * 1000,
             path: '/',
         });
 
         // Set client-readable cookie for AuthProvider
-        (await cookies()).set('postpipe_auth', encodeURIComponent(user.email), {
+        (await cookies()).set('postpipe_auth', user.email, {
             httpOnly: false, // Explicitly false so client can read it
             secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
             maxAge: 7 * 24 * 60 * 60 * 1000,
             path: '/',
         });
 
-        return { success: true, message: 'Logged in successfully' };
+        loginSuccess = true;
     } catch (error) {
         console.error('Login error:', error);
         return { success: false, message: 'Internal server error' };
     }
+
+    if (loginSuccess) {
+        redirect('/dashboard/forms');
+    }
+    
+    return { success: true, message: 'Logged in successfully' };
 }
 
 export async function logout(prevState: any, formData: FormData): Promise<AuthState> {
@@ -142,14 +153,16 @@ export async function forgotPassword(prevState: any, formData: FormData): Promis
             return { success: true, message: 'If an account exists, a reset link has been sent.' };
         }
 
-        const forgotPasswordToken = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '1h' });
-        const forgotPasswordTokenExpiry = new Date(Date.now() + 3600000);
+        const crypto = require('crypto');
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+        const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000);
 
-        user.forgotPasswordToken = forgotPasswordToken;
-        user.forgotPasswordTokenExpiry = forgotPasswordTokenExpiry;
+        user.resetTokenHash = resetTokenHash;
+        user.resetTokenExpiry = resetTokenExpiry;
         await user.save();
 
-        await sendPasswordResetEmail(email, forgotPasswordToken);
+        await sendPasswordResetEmail(email, resetToken);
 
         return { success: true, message: 'If an account exists, a reset link has been sent.' };
     } catch (error) {
@@ -170,10 +183,13 @@ export async function resetPassword(prevState: any, formData: FormData): Promise
 
     try {
         await dbConnect();
+        
+        const crypto = require('crypto');
+        const resetTokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
         const user = await User.findOne({
-            forgotPasswordToken: token,
-            forgotPasswordTokenExpiry: { $gt: Date.now() },
+            resetTokenHash: resetTokenHash,
+            resetTokenExpiry: { $gt: Date.now() },
         });
 
         if (!user) {
@@ -182,6 +198,8 @@ export async function resetPassword(prevState: any, formData: FormData): Promise
 
         const hashedPassword = await bcrypt.hash(password, 10);
         user.password = hashedPassword;
+        user.resetTokenHash = undefined;
+        user.resetTokenExpiry = undefined;
         user.forgotPasswordToken = undefined;
         user.forgotPasswordTokenExpiry = undefined;
         await user.save();
@@ -276,6 +294,11 @@ export async function getSession() {
     } catch (error) {
         return null;
     }
+}
+
+export async function getRawTokenAction() {
+    const token = (await cookies()).get('token')?.value;
+    return token || null;
 }
 
 export async function updateProfile(prevState: any, formData: FormData): Promise<AuthState> {
