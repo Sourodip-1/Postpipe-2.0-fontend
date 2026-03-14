@@ -391,7 +391,11 @@ export const forgotPassword = async (req: Request, res: Response) => {
             { expiresIn: '15m' }
         );
 
-        const frontendUrl = redirectUrl || req.headers.origin || 'http://localhost:3000';
+        // Prioritize explicit env variables (FRONTEND_URL) as they represent the master configuration for resets.
+        // Fallback to the redirectUrl provided by the client, then Next JS app url, then origin.
+        const envFrontendUrl = process.env.FRONTEND_URL;
+        const fallbackAppUrl = process.env.NEXT_PUBLIC_APP_URL;
+        const frontendUrl = envFrontendUrl || redirectUrl || fallbackAppUrl || req.headers.origin || 'http://localhost:3000';
         const resetLink = `${frontendUrl}${frontendUrl.includes('?') ? '&' : '?'}pp_action=reset-password&token=${resetToken}`;
 
         try {

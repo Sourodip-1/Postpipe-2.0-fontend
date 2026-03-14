@@ -197,6 +197,7 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
                                     <div className="mt-2 bg-orange-100/50 dark:bg-orange-950/50 p-3 rounded-md text-xs font-mono space-y-1 border border-orange-200/50 dark:border-orange-900/50 overflow-x-auto selection:bg-orange-200 dark:selection:bg-orange-900 text-orange-900 dark:text-orange-200">
                                         <div className="text-orange-900/50 dark:text-orange-200/50"># Core Auth Settings</div>
                                         <div>CONNECTOR_SECRET="<span className="opacity-50">your-super-secret-jwt-key</span>"</div>
+                                        <div>FRONTEND_URL="<span className="opacity-50">https://your-app.com</span>"</div>
 
                                         {providers.google && (
                                             <>
@@ -239,6 +240,11 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
                                         )}
                                     </div>
                                 </li>
+                                {providers.email && (
+                                    <li className="mt-4">
+                                        <strong>Password Reset Page:</strong> To handle password resets, create a page (e.g., <code>reset-password.html</code>) on your frontend domain and paste this exact same Auth Snippet there. Set <code>FRONTEND_URL</code> in your connector's <code>.env</code> to point to this new page.
+                                    </li>
+                                )}
                             </ul>
                         </div>
                     </div>
