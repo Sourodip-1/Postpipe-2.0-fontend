@@ -363,7 +363,7 @@ export const logout = async (req: Request, res: Response) => {
 
 export const forgotPassword = async (req: Request, res: Response) => {
     try {
-        const { email, targetDatabase, redirectUrl } = req.body;
+        const { email, targetDatabase, redirectUrl, envFrontendUrlAlias } = req.body;
 
         if (!email) {
             return res.status(400).json({ message: 'Email is required.' });
@@ -391,9 +391,9 @@ export const forgotPassword = async (req: Request, res: Response) => {
             { expiresIn: '15m' }
         );
 
-        // Prioritize explicit env variables (FRONTEND_URL) as they represent the master configuration for resets.
+        // Prioritize explicit env variables (envFrontendUrlAlias or FRONTEND_URL) as they represent the master configuration for resets.
         // Fallback to the redirectUrl provided by the client, then Next JS app url, then origin.
-        const envFrontendUrl = process.env.FRONTEND_URL;
+        const envFrontendUrl = (envFrontendUrlAlias && process.env[envFrontendUrlAlias]) || process.env.FRONTEND_URL;
         const fallbackAppUrl = process.env.NEXT_PUBLIC_APP_URL;
         const frontendUrl = envFrontendUrl || redirectUrl || fallbackAppUrl || req.headers.origin || 'http://localhost:3000';
         const resetLink = `${frontendUrl}${frontendUrl.includes('?') ? '&' : '?'}pp_action=reset-password&token=${resetToken}`;

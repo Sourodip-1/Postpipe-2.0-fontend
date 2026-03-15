@@ -19,6 +19,7 @@ export async function GET(req: Request) {
                 projectId: null,
                 providers: ['email'],
                 redirectUrl: window.location.origin,
+                envFrontendUrlAlias: null,
                 apiUrl: 'http://localhost:3002/api/auth'
             };
             this.listeners = {
@@ -77,7 +78,8 @@ export async function GET(req: Request) {
                         email, password, 
                         projectId: this.config.projectId, 
                         targetDatabase: this.config.targetDatabase,
-                        redirectUrl: this.config.redirectUrl
+                        redirectUrl: this.config.redirectUrl,
+                        envFrontendUrlAlias: this.config.envFrontendUrlAlias
                     })
                 });
 
@@ -113,7 +115,8 @@ export async function GET(req: Request) {
                         name, email, password, 
                         projectId: this.config.projectId, 
                         targetDatabase: this.config.targetDatabase,
-                        redirectUrl: this.config.redirectUrl
+                        redirectUrl: this.config.redirectUrl,
+                        envFrontendUrlAlias: this.config.envFrontendUrlAlias
                     })
                 });
 
@@ -267,7 +270,8 @@ export async function GET(req: Request) {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         email,
-                        redirectUrl: this.config.redirectUrl
+                        redirectUrl: this.config.redirectUrl,
+                        envFrontendUrlAlias: this.config.envFrontendUrlAlias
                     })
                 });
 
@@ -281,7 +285,7 @@ export async function GET(req: Request) {
         }
 
         loginWithOAuth(provider) {
-            const oauthUrl = \`\${this.config.apiUrl}/\${provider}?projectId=\${this.config.projectId || ''}&targetDatabase=\${this.config.targetDatabase || ''}&redirect=\${encodeURIComponent(window.location.href)}\`;
+            const oauthUrl = \`\${this.config.apiUrl}/\${provider}?projectId=\${this.config.projectId || ''}&targetDatabase=\${this.config.targetDatabase || ''}&envFrontendUrlAlias=\${this.config.envFrontendUrlAlias || ''}&redirect=\${encodeURIComponent(window.location.href)}\`;
             window.location.href = oauthUrl;
         }
 
