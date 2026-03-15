@@ -138,6 +138,7 @@ export async function createAuthPresetAction(formData: FormData) {
     const targetDatabase = formData.get('targetDatabase') as string;
     const projectId = formData.get('projectId') as string;
     const redirectUrl = formData.get('redirectUrl') as string;
+    const envFrontendUrlAlias = formData.get('envFrontendUrlAlias') as string;
     const apiUrl = formData.get('apiUrl') as string;
     const providersJson = formData.get('providers') as string;
 
@@ -160,6 +161,7 @@ export async function createAuthPresetAction(formData: FormData) {
             targetDatabase: targetDatabase === 'default' ? undefined : targetDatabase,
             projectId,
             redirectUrl,
+            envFrontendUrlAlias,
             apiUrl,
             providers
         });
@@ -179,6 +181,7 @@ export async function updateAuthPresetAction(presetId: string, formData: FormDat
     const targetDatabase = formData.get('targetDatabase') as string;
     const projectId = formData.get('projectId') as string;
     const redirectUrl = formData.get('redirectUrl') as string;
+    const envFrontendUrlAlias = formData.get('envFrontendUrlAlias') as string;
     const apiUrl = formData.get('apiUrl') as string;
     const providersJson = formData.get('providers') as string;
 
@@ -203,6 +206,7 @@ export async function updateAuthPresetAction(presetId: string, formData: FormDat
             targetDatabase: targetDatabase === 'default' ? undefined : targetDatabase,
             projectId,
             redirectUrl,
+            envFrontendUrlAlias,
             apiUrl,
             providers
         });

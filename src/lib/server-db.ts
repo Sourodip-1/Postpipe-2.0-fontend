@@ -92,6 +92,7 @@ export interface AuthPreset {
   targetDatabase?: string;
   projectId?: string;
   redirectUrl?: string;
+  envFrontendUrlAlias?: string;
   apiUrl?: string;
   providers: {
     email: boolean;

@@ -29,6 +29,7 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
     });
     const [requireEmailVerification, setRequireEmailVerification] = React.useState(initialPreset?.providers?.requireEmailVerification || false);
     const [redirectUrl, setRedirectUrl] = React.useState(initialPreset?.redirectUrl || "");
+    const [envFrontendUrlAlias, setEnvFrontendUrlAlias] = React.useState(initialPreset?.envFrontendUrlAlias || "");
     const [projectId, setProjectId] = React.useState(initialPreset?.projectId || "");
     const [targetDatabase, setTargetDatabase] = React.useState(initialPreset?.targetDatabase || "default");
     const [apiUrl, setApiUrl] = React.useState(initialPreset?.apiUrl || "");
@@ -93,7 +94,7 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
         apiUrl: "${apiUrl}",
         projectId: "${projectId || 'YOUR_PROJECT_ID'}",
         providers: ${JSON.stringify(activeProviders)},
-        redirectUrl: ${(!redirectUrl || redirectUrl === 'window.location.origin') ? 'window.location.origin' : `"${redirectUrl}"`}${targetDatabase && targetDatabase !== 'default' ? `,\n        targetDatabase: "${targetDatabase}"` : ''}
+        redirectUrl: ${(!redirectUrl || redirectUrl === 'window.location.origin') ? 'window.location.origin' : `"${redirectUrl}"`}${envFrontendUrlAlias ? `,\n        envFrontendUrlAlias: "${envFrontendUrlAlias}"` : ''}${targetDatabase && targetDatabase !== 'default' ? `,\n        targetDatabase: "${targetDatabase}"` : ''}
     });
 
     // Handle Auth Events
@@ -140,6 +141,7 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
             formData.append("targetDatabase", targetDatabase);
             formData.append("projectId", projectId);
             formData.append("redirectUrl", redirectUrl);
+            formData.append("envFrontendUrlAlias", envFrontendUrlAlias);
             formData.append("apiUrl", apiUrl);
             formData.append("providers", JSON.stringify({
                 ...providers,
@@ -197,7 +199,7 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
                                     <div className="mt-2 bg-orange-100/50 dark:bg-orange-950/50 p-3 rounded-md text-xs font-mono space-y-1 border border-orange-200/50 dark:border-orange-900/50 overflow-x-auto selection:bg-orange-200 dark:selection:bg-orange-900 text-orange-900 dark:text-orange-200">
                                         <div className="text-orange-900/50 dark:text-orange-200/50"># Core Auth Settings</div>
                                         <div>CONNECTOR_SECRET="<span className="opacity-50">your-super-secret-jwt-key</span>"</div>
-                                        <div>FRONTEND_URL="<span className="opacity-50">https://your-app.com</span>"</div>
+                                        <div>{envFrontendUrlAlias || 'FRONTEND_URL'}="<span className="opacity-50">https://your-app.com</span>"</div>
 
                                         {providers.google && (
                                             <>
@@ -242,7 +244,7 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
                                 </li>
                                 {providers.email && (
                                     <li className="mt-4">
-                                        <strong>Password Reset Page:</strong> To handle password resets, create a page (e.g., <code>reset-password.html</code>) on your frontend domain and paste this exact same Auth Snippet there. Set <code>FRONTEND_URL</code> in your connector's <code>.env</code> to point to this new page.
+                                        <strong>Password Reset Page:</strong> To handle password resets, create a page (e.g., <code>reset-password.html</code>) on your frontend domain and paste this exact same Auth Snippet there. Set <code>{envFrontendUrlAlias || 'FRONTEND_URL'}</code> in your connector's <code>.env</code> to point to this new page.
                                     </li>
                                 )}
                             </ul>
@@ -382,6 +384,19 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
                             <p className="text-xs text-muted-foreground">Where to send the user after successful authentication.</p>
                         </div>
 
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium flex items-center gap-2">
+                                <LinkIcon className="h-4 w-4 text-muted-foreground" />
+                                Frontend URL .env Alias (Optional)
+                            </label>
+                            <Input
+                                placeholder="e.g., APP1_FRONTEND_URL"
+                                value={envFrontendUrlAlias}
+                                onChange={(e) => setEnvFrontendUrlAlias(e.target.value)}
+                            />
+                            <p className="text-xs text-muted-foreground">Custom environment variable name your connector should use to read this frontend's URL for routing.</p>
+                        </div>
+
                         <div className="space-y-4 pt-4 border-t">
                             <div className="space-y-2">
                                 <label className="text-sm font-medium flex items-center gap-2">
@@ -472,7 +487,7 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
                             <span className="text-[#89B4FA]">    apiUrl</span>: <span className="text-[#A6E3A1]">"{apiUrl}"</span>,{'\n'}
                             <span className="text-[#89B4FA]">    projectId</span>: <span className="text-[#A6E3A1]">"{projectId || 'YOUR_PROJECT_ID'}"</span>,{'\n'}
                             <span className="text-[#89B4FA]">    providers</span>: <span className="text-[#F9E2AF]">{JSON.stringify(Object.keys(providers).filter(k => providers[k as keyof typeof providers]))}</span>,{'\n'}
-                            <span className="text-[#89B4FA]">    redirectUrl</span>: {redirectUrl ? <span className="text-[#A6E3A1]">"{redirectUrl}"</span> : <span className="text-[#F9E2AF]">window.location.href</span>}{targetDatabase && targetDatabase !== 'default' ? `,\n    targetDatabase: "${targetDatabase}"` : ''}{'\n'}
+                            <span className="text-[#89B4FA]">    redirectUrl</span>: {redirectUrl ? <span className="text-[#A6E3A1]">"{redirectUrl}"</span> : <span className="text-[#F9E2AF]">window.location.href</span>}{envFrontendUrlAlias ? `,\n    envFrontendUrlAlias: "${envFrontendUrlAlias}"` : ''}{targetDatabase && targetDatabase !== 'default' ? `,\n    targetDatabase: "${targetDatabase}"` : ''}{'\n'}
                             {`}`});{'\n\n'}
                             <span className="text-[#7EE787]">// Handle Auth Events</span>{'\n'}
                             <span className="text-[#89B4FA]">PostpipeAuth</span>.<span className="text-[#89B4FA]">on</span>(<span className="text-[#A6E3A1]">"success"</span>, (<span className="text-[#F38BA8]">user</span>) <span className="text-[#CBA6F7]">=&gt;</span> {`{`}{'\n'}
