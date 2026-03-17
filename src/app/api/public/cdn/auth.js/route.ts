@@ -30,6 +30,8 @@ export async function GET(req: Request) {
             this._mode = 'login';
             this._pendingEmail = '';
             this._token = null;
+            this._isRegisterMode = false;
+            this._isForgotPasswordMode = false;
         }
 
         init(userConfig) {
@@ -326,10 +328,10 @@ export async function GET(req: Request) {
                 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
                 
                 .pp-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); display: flex; align-items: center; justify-content: center; z-index: 999999; padding: 20px; animation: pp-fade-in 0.3s ease-out; box-sizing: border-box; }
-                #postpipe-auth { font-family: 'Inter', system-ui, -apple-system, sans-serif; width: auto; max-width: 100%; position: relative; box-sizing: border-box; }
+                #postpipe-auth { font-family: 'Inter', system-ui, -apple-system, sans-serif; width: 100%; max-width: 440px; margin: 0 auto; background: #fff; border-radius: 32px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); border: 1px solid rgba(0,0,0,0.05); padding: 40px; position: relative; box-sizing: border-box; }
                 #postpipe-auth * { box-sizing: border-box !important; }
-                .pp-card { width: 100%; max-width: 440px; margin: 0 auto; padding: 40px; background: #fff; border-radius: 32px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); border: 1px solid rgba(0,0,0,0.05); position: relative; box-sizing: border-box; }
-                .pp-overlay .pp-card { animation: pp-slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+                .pp-overlay .pp-card { animation: pp-slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1); width: 100%; max-width: 440px; display: flex; justify-content: center; }
+                .pp-overlay #postpipe-auth { animation: pp-slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
                 
                 .pp-title { font-size: 28px; font-weight: 800; text-align: center; margin: 0 0 12px 0; color: #111; letter-spacing: -0.04em; }
                 .pp-subtitle { font-size: 15px; text-align: center; color: #666; margin-bottom: 32px; line-height: 1.5; }
@@ -377,9 +379,7 @@ export async function GET(req: Request) {
                 .pp-close-overlay:hover { background: #f3f4f6; color: #4b5563; }
                 
                 @media (max-width: 480px) {
-                    #postpipe-auth { padding: 0 16px; }
-                    .pp-card { padding: 24px 16px; border-radius: 24px; width: auto; margin: 0 16px; }
-                    .pp-card #postpipe-auth { padding: 0; }
+                    #postpipe-auth { padding: 24px 16px; border-radius: 24px; width: auto; margin: 0 16px; }
                     .pp-title { font-size: 24px; margin-bottom: 8px; }
                     .pp-subtitle { font-size: 14px; margin-bottom: 24px; }
                     .pp-input { padding: 12px 14px; font-size: 15px; }
@@ -395,7 +395,7 @@ export async function GET(req: Request) {
             const btn = document.getElementById('pp-submit-btn');
             if (btn) {
                 btn.disabled = isLoading;
-                let text = this._mode === 'otp' ? 'Verify & Sign In' : (this._isRegisterMode ? 'Create Account' : (this._isForgotPasswordMode ? 'Send Reset Link' : 'Sign In'));
+                const text = this._mode === 'otp' ? 'Verify & Log In' : (this._isRegisterMode ? 'Create Account' : (this._isForgotPasswordMode ? 'Send Reset Link' : 'Log In'));
                 btn.innerHTML = isLoading ? '<span class="pp-spinner"></span>' : text;
             }
         }
@@ -445,7 +445,7 @@ export async function GET(req: Request) {
                 
                 overlay.appendChild(card);
                 card.appendChild(container);
-                card.appendChild(closeBtn);
+                container.appendChild(closeBtn);
                 document.body.appendChild(overlay);
             }
 
@@ -498,13 +498,13 @@ export async function GET(req: Request) {
                         style="text-align: center; letter-spacing: 0.5em; font-size: 24px; font-weight: 800; color: #4f46e5; background: #f5f3ff; border-color: #c7d2fe" autofocus>
                 </div>
                 
-                <button id="pp-submit-btn" onclick="PostpipeAuth.verifyOtp()" class="pp-btn pp-btn-primary">Verify & Sign In</button>
+                <button id="pp-submit-btn" onclick="PostpipeAuth.verifyOtp()" class="pp-btn pp-btn-primary">Verify & Log In</button>
                 
                 <div class="pp-toggle-mode">
                     Didn't get a code? <a onclick="PostpipeAuth.resendOtp()">Resend Code</a>
                 </div>
                 <div class="pp-toggle-mode" style="margin-top: 12px">
-                    <a onclick="PostpipeAuth._mode = 'login'; PostpipeAuth.render()">Back to Sign In</a>
+                    <a onclick="PostpipeAuth._mode = 'login'; PostpipeAuth.render()">Back to Log In</a>
                 </div>
             \`;
         }
@@ -514,8 +514,8 @@ export async function GET(req: Request) {
             const hasGithub = this.config.providers.includes('github');
             const hasEmail = this.config.providers.includes('email');
 
-            let title = this._isRegisterMode ? 'Create Account' : (this._isForgotPasswordMode ? 'Reset Password' : 'Welcome Back');
-            let subtitle = this._isRegisterMode ? 'Start building something amazing' : (this._isForgotPasswordMode ? 'Enter your email to receive a reset link' : 'Enter your credentials to continue');
+            const title = this._isRegisterMode ? 'Create Account' : (this._isForgotPasswordMode ? 'Reset Password' : 'Welcome Back');
+            const subtitle = this._isRegisterMode ? 'Start building something amazing' : (this._isForgotPasswordMode ? 'Enter your email to receive a reset link' : 'Enter your credentials to continue');
 
             let html = \`
                 <h2 class="pp-title">\${title}</h2>
@@ -536,10 +536,11 @@ export async function GET(req: Request) {
                 if (!this._isForgotPasswordMode) {
                     html += \`<div class="pp-input-group"><label style="display:flex; justify-content:space-between">Password \${!this._isRegisterMode ? \`<a onclick="PostpipeAuth._toggleForgot()" style="color:#4f46e5; cursor:pointer; font-weight:600; font-size:12px">Forgot?</a>\` : ''}</label><input type="password" id="pp-password" class="pp-input" placeholder="••••••••"></div>\`;
                 }
-                html += \`<button id="pp-submit-btn" onclick="PostpipeAuth._handleSubmit()" class="pp-btn pp-btn-primary">Sign In</button>\`;
+                const btnText = this._isRegisterMode ? 'Create Account' : (this._isForgotPasswordMode ? 'Send Reset Link' : 'Log In');
+                html += \`<button id="pp-submit-btn" onclick="PostpipeAuth._handleSubmit()" class="pp-btn pp-btn-primary">\${btnText}</button>\`;
             }
 
-            html += \`<div class="pp-toggle-mode">\${this._isForgotPasswordMode ? 'Remembered? <a onclick="PostpipeAuth._toggleForgot()">Go back</a>' : (this._isRegisterMode ? 'Already have an account? <a onclick="PostpipeAuth._toggleMode()">Sign In</a>' : 'No account? <a onclick="PostpipeAuth._toggleMode()">Sign Up</a>')}</div>\`;
+            html += \`<div class="pp-toggle-mode">\${this._isForgotPasswordMode ? 'Remembered? <a onclick="PostpipeAuth._toggleForgot()">Go back</a>' : (this._isRegisterMode ? 'Already have an account? <a onclick="PostpipeAuth._toggleMode()">Log In</a>' : 'No account? <a onclick="PostpipeAuth._toggleMode()">Sign Up</a>')}</div>\`;
             
             container.innerHTML = html;
         }
@@ -577,7 +578,7 @@ export async function GET(req: Request) {
                     <div class="pp-celebration">🎉</div>
                     <h2 class="pp-title">\${title}</h2>
                     <p class="pp-subtitle">\${text}</p>
-                    <button onclick="PostpipeAuth._clearParams()" class="pp-btn pp-btn-primary">Continue to Sign In</button>
+                    <button onclick="PostpipeAuth._clearParams()" class="pp-btn pp-btn-primary">Continue to Log In</button>
                 </div>
             \`;
         }
@@ -625,7 +626,9 @@ export async function GET(req: Request) {
         status: 200,
         headers: {
             'Content-Type': 'application/javascript',
-            'Cache-Control': 'public, max-age=3600, s-maxage=3600'
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
         }
     });
 }
