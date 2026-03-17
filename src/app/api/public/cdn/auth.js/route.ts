@@ -326,8 +326,8 @@ export async function GET(req: Request) {
                 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
                 
                 .pp-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); display: flex; align-items: center; justify-content: center; z-index: 999999; padding: 20px; animation: pp-fade-in 0.3s ease-out; box-sizing: border-box; }
-                #postpipe-auth { font-family: 'Inter', system-ui, -apple-system, sans-serif; width: 100%; position: relative; overflow: hidden; box-sizing: border-box; }
-                #postpipe-auth * { box-sizing: border-box; }
+                #postpipe-auth { font-family: 'Inter', system-ui, -apple-system, sans-serif; width: auto; max-width: 100%; position: relative; box-sizing: border-box; }
+                #postpipe-auth * { box-sizing: border-box !important; }
                 .pp-card { width: 100%; max-width: 440px; margin: 0 auto; padding: 40px; background: #fff; border-radius: 32px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); border: 1px solid rgba(0,0,0,0.05); position: relative; box-sizing: border-box; }
                 .pp-overlay .pp-card { animation: pp-slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
                 
@@ -336,10 +336,10 @@ export async function GET(req: Request) {
                 
                 .pp-input-group { margin-bottom: 24px; }
                 .pp-input-group label { display: block; font-size: 14px; font-weight: 600; color: #333; margin-bottom: 10px; padding-left: 4px; }
-                .pp-input { width: 100%; box-sizing: border-box; padding: 14px 18px; border: 2px solid #f0f0f0; border-radius: 16px; font-size: 16px; transition: all 0.2s; background: #f9fafb; font-family: inherit; }
+                .pp-input { width: 100%; max-width: 100%; box-sizing: border-box; padding: 14px 18px; border: 2px solid #f0f0f0; border-radius: 16px; font-size: 16px; transition: all 0.2s; background: #f9fafb; font-family: inherit; }
                 .pp-input:focus { outline: none; border-color: #6366f1; background: #fff; box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1); }
                 
-                .pp-btn { width: 100%; padding: 14px; border: none; border-radius: 16px; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); display: flex; align-items: center; justify-content: center; gap: 10px; font-family: inherit; }
+                .pp-btn { width: 100%; max-width: 100%; padding: 14px; border: none; border-radius: 16px; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); display: flex; align-items: center; justify-content: center; gap: 10px; font-family: inherit; }
                 .pp-btn:disabled { opacity: 0.7; cursor: not-allowed; }
                 .pp-btn-primary { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: #fff; box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.3); }
                 .pp-btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 15px 20px -5px rgba(99, 102, 241, 0.4); }
@@ -377,11 +377,13 @@ export async function GET(req: Request) {
                 .pp-close-overlay:hover { background: #f3f4f6; color: #4b5563; }
                 
                 @media (max-width: 480px) {
-                    .pp-card { padding: 24px; border-radius: 24px; }
+                    #postpipe-auth { padding: 0 16px; }
+                    .pp-card { padding: 24px 16px; border-radius: 24px; width: auto; margin: 0 16px; }
+                    .pp-card #postpipe-auth { padding: 0; }
                     .pp-title { font-size: 24px; margin-bottom: 8px; }
                     .pp-subtitle { font-size: 14px; margin-bottom: 24px; }
-                    .pp-input { padding: 12px 16px; font-size: 15px; }
-                    .pp-btn { padding: 12px; font-size: 15px; }
+                    .pp-input { padding: 12px 14px; font-size: 15px; }
+                    .pp-btn { padding: 12px 14px; font-size: 15px; }
                     .pp-close-overlay { top: 12px; right: 12px; width: 32px; height: 32px; font-size: 18px; }
                     .pp-celebration { font-size: 48px; }
                 }
