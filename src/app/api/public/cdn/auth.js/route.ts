@@ -325,9 +325,11 @@ export async function GET(req: Request) {
             style.innerHTML = \`
                 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
                 
-                .pp-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); display: flex; align-items: center; justify-content: center; z-index: 999999; padding: 20px; animation: pp-fade-in 0.3s ease-out; }
-                #postpipe-auth { font-family: 'Inter', system-ui, -apple-system, sans-serif; width: 100%; max-width: 440px; margin: 0 auto; padding: 40px; background: #fff; border-radius: 32px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); border: 1px solid rgba(0,0,0,0.05); position: relative; overflow: hidden; }
-                .pp-overlay #postpipe-auth { animation: pp-slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+                .pp-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); display: flex; align-items: center; justify-content: center; z-index: 999999; padding: 20px; animation: pp-fade-in 0.3s ease-out; box-sizing: border-box; }
+                #postpipe-auth { font-family: 'Inter', system-ui, -apple-system, sans-serif; width: 100%; position: relative; overflow: hidden; box-sizing: border-box; }
+                #postpipe-auth * { box-sizing: border-box; }
+                .pp-card { width: 100%; max-width: 440px; margin: 0 auto; padding: 40px; background: #fff; border-radius: 32px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); border: 1px solid rgba(0,0,0,0.05); position: relative; box-sizing: border-box; }
+                .pp-overlay .pp-card { animation: pp-slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
                 
                 .pp-title { font-size: 28px; font-weight: 800; text-align: center; margin: 0 0 12px 0; color: #111; letter-spacing: -0.04em; }
                 .pp-subtitle { font-size: 15px; text-align: center; color: #666; margin-bottom: 32px; line-height: 1.5; }
@@ -371,8 +373,18 @@ export async function GET(req: Request) {
                 .pp-gradient-loader::after { content: ''; position: absolute; left: -50%; top: 0; height: 100%; width: 50%; background: linear-gradient(90deg, transparent, #6366f1, transparent); animation: pp-loading 1.2s infinite ease-in-out; }
                 @keyframes pp-loading { from { left: -50%; } to { left: 100%; } }
 
-                .pp-close-overlay { position: absolute; top: 20px; right: 20px; width: 40px; height: 40px; background: #f9fafb; border-radius: 50%; cursor: pointer; border: none; font-size: 20px; display: flex; align-items: center; justify-content: center; color: #9ca3af; transition: all 0.2s; }
+                .pp-close-overlay { position: absolute; top: 20px; right: 20px; width: 40px; height: 40px; background: #f9fafb; border-radius: 50%; cursor: pointer; border: none; font-size: 20px; display: flex; align-items: center; justify-content: center; color: #9ca3af; transition: all 0.2s; z-index: 10; }
                 .pp-close-overlay:hover { background: #f3f4f6; color: #4b5563; }
+                
+                @media (max-width: 480px) {
+                    .pp-card { padding: 24px; border-radius: 24px; }
+                    .pp-title { font-size: 24px; margin-bottom: 8px; }
+                    .pp-subtitle { font-size: 14px; margin-bottom: 24px; }
+                    .pp-input { padding: 12px 16px; font-size: 15px; }
+                    .pp-btn { padding: 12px; font-size: 15px; }
+                    .pp-close-overlay { top: 12px; right: 12px; width: 32px; height: 32px; font-size: 18px; }
+                    .pp-celebration { font-size: 48px; }
+                }
             \`;
             document.head.appendChild(style);
         }
@@ -414,6 +426,9 @@ export async function GET(req: Request) {
                 overlay.className = 'pp-overlay';
                 overlay.id = 'pp-auth-overlay';
                 
+                const card = document.createElement('div');
+                card.className = 'pp-card';
+                
                 container = document.createElement('div');
                 container.id = 'postpipe-auth';
                 
@@ -426,8 +441,9 @@ export async function GET(req: Request) {
                     this._clearParams();
                 };
                 
-                overlay.appendChild(container);
-                container.appendChild(closeBtn);
+                overlay.appendChild(card);
+                card.appendChild(container);
+                card.appendChild(closeBtn);
                 document.body.appendChild(overlay);
             }
 
