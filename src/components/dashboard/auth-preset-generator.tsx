@@ -79,6 +79,8 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
         });
     };
 
+    const projectAlias = presetName.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'PROJECT';
+
     const generateSnippet = () => {
         const activeProviders = Object.keys(providers).filter(k => providers[k as keyof typeof providers]);
 
@@ -94,7 +96,7 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
         apiUrl: "${apiUrl}",
         projectId: "${projectId || 'YOUR_PROJECT_ID'}",
         providers: ${JSON.stringify(activeProviders)},
-        redirectUrl: ${(!redirectUrl || redirectUrl === 'window.location.origin') ? 'window.location.origin' : `"${redirectUrl}"`}${envFrontendUrlAlias ? `,\n        envFrontendUrlAlias: "${envFrontendUrlAlias}"` : ''}${targetDatabase && targetDatabase !== 'default' ? `,\n        targetDatabase: "${targetDatabase}"` : ''}
+        redirectUrl: ${(!redirectUrl || redirectUrl === 'window.location.origin') ? 'window.location.origin' : `"${redirectUrl}"`}${envFrontendUrlAlias ? `,\n        envFrontendUrlAlias: "${envFrontendUrlAlias}"` : ''}${projectAlias ? `,\n        projectAlias: "${projectAlias}"` : ''}${targetDatabase && targetDatabase !== 'default' ? `,\n        targetDatabase: "${targetDatabase}"` : ''}
     });
 
     // Handle Auth Events
@@ -173,8 +175,6 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
             setIsSaving(false);
         }
     };
-
-    const projectAlias = presetName.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'PROJECT';
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
