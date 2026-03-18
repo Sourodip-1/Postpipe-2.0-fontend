@@ -115,9 +115,10 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
 
         if (providers.email && requireEmailVerification) {
             setTimeout(() => {
+                const providerMessage = emailProvider === 'resend' ? "RESEND_API_KEY" : "SMTP_HOST and other Nodemailer variables";
                 toast({
                     title: "Action Required",
-                    description: "Remember to set RESEND_API_KEY in your connector's .env to enable verification emails.",
+                    description: "Remember to set " + providerMessage + " in your connector's .env to enable verification emails.",
                 });
             }, 300);
         }

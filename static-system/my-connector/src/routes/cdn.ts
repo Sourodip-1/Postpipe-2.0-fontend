@@ -51,7 +51,7 @@ router.get('/auth.js', (req: Request, res: Response) => {
                 const response = await fetch(\`\${this.config.apiUrl}/login\`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password, projectId: this.config.projectId, targetDatabase: this.config.targetDatabase })
+                    body: JSON.stringify({ email, password, projectId: this.config.projectId, targetDatabase: this.config.targetDatabase, projectAlias: this.config.projectAlias, envFrontendUrlAlias: this.config.envFrontendUrlAlias })
                 });
                 const data = await response.json();
                 
@@ -79,7 +79,7 @@ router.get('/auth.js', (req: Request, res: Response) => {
                 const response = await fetch(\`\${this.config.apiUrl}/register\`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, email, password, projectId: this.config.projectId, targetDatabase: this.config.targetDatabase })
+                    body: JSON.stringify({ name, email, password, projectId: this.config.projectId, targetDatabase: this.config.targetDatabase, projectAlias: this.config.projectAlias, envFrontendUrlAlias: this.config.envFrontendUrlAlias })
                 });
                 const data = await response.json();
                 
@@ -110,7 +110,7 @@ router.get('/auth.js', (req: Request, res: Response) => {
                 const response = await fetch(\`\${this.config.apiUrl}/verify-otp\`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: this._pendingEmail, otp, targetDatabase: this.config.targetDatabase })
+                    body: JSON.stringify({ email: this._pendingEmail, otp, targetDatabase: this.config.targetDatabase, projectAlias: this.config.projectAlias, envFrontendUrlAlias: this.config.envFrontendUrlAlias })
                 });
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.message || 'Verification failed');
@@ -136,7 +136,7 @@ router.get('/auth.js', (req: Request, res: Response) => {
                 const response = await fetch(\`\${this.config.apiUrl}/resend-otp\`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: this._pendingEmail, targetDatabase: this.config.targetDatabase })
+                    body: JSON.stringify({ email: this._pendingEmail, targetDatabase: this.config.targetDatabase, projectAlias: this.config.projectAlias, envFrontendUrlAlias: this.config.envFrontendUrlAlias })
                 });
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.message);
@@ -149,7 +149,7 @@ router.get('/auth.js', (req: Request, res: Response) => {
         }
 
         loginWithOAuth(provider) {
-            const oauthUrl = \`\${this.config.apiUrl}/\${provider}?projectId=\${this.config.projectId || ''}&targetDatabase=\${this.config.targetDatabase || ''}&redirect=\${encodeURIComponent(window.location.href)}\`;
+            const oauthUrl = \`\${this.config.apiUrl}/\${provider}?projectId=\${this.config.projectId || ''}&targetDatabase=\${this.config.targetDatabase || ''}&projectAlias=\${this.config.projectAlias || ''}&envFrontendUrlAlias=\${this.config.envFrontendUrlAlias || ''}&redirect=\${encodeURIComponent(window.location.href)}\`;
             window.location.href = oauthUrl;
         }
 
@@ -163,7 +163,7 @@ router.get('/auth.js', (req: Request, res: Response) => {
                     const response = await fetch(\`\${this.config.apiUrl}/verify-email\`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ token, targetDatabase: this.config.targetDatabase })
+                        body: JSON.stringify({ token, targetDatabase: this.config.targetDatabase, projectAlias: this.config.projectAlias, envFrontendUrlAlias: this.config.envFrontendUrlAlias })
                     });
                     const data = await response.json();
                     if (!response.ok) throw new Error(data.message || 'Verification failed');
