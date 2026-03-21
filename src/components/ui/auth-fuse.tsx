@@ -193,7 +193,7 @@ import Loader from "@/components/ui/loader";
 
 function SignInForm({ setView }: { setView: (v: "signin" | "signup" | "forgot") => void }) {
     const router = useRouter();
-    const [state, formAction] = useActionState(login, { success: false, message: "" });
+    const [state, formAction, isPending] = useActionState(login, { success: false, message: "" });
 
     return (
         <form action={formAction} autoComplete="on" className="flex flex-col gap-8">
@@ -218,7 +218,9 @@ function SignInForm({ setView }: { setView: (v: "signin" | "signup" | "forgot") 
                     </p>
                 )}
 
-                <Button type="submit" variant="default" className="mt-2 text-white dark:text-black">Sign In</Button>
+                <Button type="submit" variant="default" className="mt-2 text-white dark:text-black" disabled={isPending}>
+                    {isPending ? <div className="scale-75 -mx-4 flex items-center justify-center"><Loader /></div> : "Sign In"}
+                </Button>
             </div>
         </form>
     );
@@ -306,7 +308,7 @@ function SignUpForm({ setView }: { setView: (v: "signin" | "signup" | "forgot") 
 }
 
 function ForgotPasswordForm({ setView }: { setView: (v: "signin" | "signup" | "forgot") => void }) {
-    const [state, formAction] = useActionState(forgotPassword, { success: false, message: "" });
+    const [state, formAction, isPending] = useActionState(forgotPassword, { success: false, message: "" });
 
     return (
         <form action={formAction} autoComplete="on" className="flex flex-col gap-8">
@@ -323,7 +325,9 @@ function ForgotPasswordForm({ setView }: { setView: (v: "signin" | "signup" | "f
                     </p>
                 )}
 
-                <Button type="submit" variant="default" className="mt-2 text-white dark:text-black">Send Reset Link</Button>
+                <Button type="submit" variant="default" className="mt-2 text-white dark:text-black" disabled={isPending}>
+                    {isPending ? <div className="scale-75 -mx-4 flex items-center justify-center"><Loader /></div> : "Send Reset Link"}
+                </Button>
             </div>
 
             <div className="text-center text-sm">

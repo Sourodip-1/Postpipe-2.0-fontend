@@ -3,6 +3,7 @@
 import { useActionState } from 'react';
 import { resetPassword } from '../actions';
 import { useSearchParams } from 'next/navigation';
+import Loader from "@/components/ui/loader";
 
 const initialState = {
     message: '',
@@ -12,7 +13,7 @@ const initialState = {
 export default function ResetPasswordPage() {
     const searchParams = useSearchParams();
     const token = searchParams.get('token');
-    const [state, action] = useActionState(resetPassword, initialState);
+    const [state, action, isPending] = useActionState(resetPassword, initialState);
 
     if (!token) {
         return <div>Invalid token</div>;
@@ -49,8 +50,8 @@ export default function ResetPasswordPage() {
                         />
                     </div>
 
-                    <button type="submit" className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 mt-2">
-                        Reset Password
+                    <button type="submit" disabled={isPending} className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 mt-2">
+                        {isPending ? <div className="scale-75 -mx-4 flex items-center justify-center"><Loader /></div> : "Reset Password"}
                     </button>
                 </form>
 

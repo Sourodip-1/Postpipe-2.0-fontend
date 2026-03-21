@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { FIELD_TYPES, getGroupedFieldTypes } from "@/config/field-types";
 import { RainbowButton } from "@/components/ui/rainbow-button";
+import Loader from "@/components/ui/loader";
 import { BorderBeam } from "@/components/ui/border-beam";
 import { AnimatedShinyText } from "@/components/ui/animated-shiny-text";
 import { toast } from "@/hooks/use-toast";
@@ -171,6 +172,7 @@ export default function NewFormClient({ onBack, initialData }: NewFormClientProp
     const [activeTab, setActiveTab] = useState("build");
     const [addPulse, setAddPulse] = useState(false);
     const [newFieldId, setNewFieldId] = useState<string | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
 
     const initialFields = initialData?.fields
         ? initialData.fields.map((f: any, i: number) => ({ id: i.toString(), label: f.name, type: f.type, required: f.required }))
@@ -243,6 +245,8 @@ export default function NewFormClient({ onBack, initialData }: NewFormClientProp
             return;
         }
 
+        setIsSaving(true);
+
         const formData = new FormData();
         formData.append('name', formName);
         formData.append('connectorId', connector);
@@ -268,6 +272,8 @@ export default function NewFormClient({ onBack, initialData }: NewFormClientProp
             }
         } catch (e) {
             toast({ title: "Error", description: "Failed to deploy form.", variant: "destructive" });
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -598,8 +604,8 @@ ${opts.map(o => `          <option value="${o}">${o}</option>`).join('\n')}
                         <Button variant="ghost" className="h-9 px-4 text-sm text-neutral-400 hover:text-white hover:bg-white/5 border border-white/5 rounded-xl transition-all mr-2" onClick={handleReset}>
                             <RotateCcw className="w-4 h-4 mr-2" /> Reset
                         </Button>
-                        <RainbowButton onClick={handleSave} className="h-9 px-6 text-sm shadow-[0_0_15px_rgba(139,92,246,0.3)]">
-                            <Save className="w-4 h-4 mr-2" /> {initialData ? "Update Form" : "Deploy Form"}
+                        <RainbowButton onClick={handleSave} className="h-9 px-6 text-sm shadow-[0_0_15px_rgba(139,92,246,0.3)]" disabled={isSaving}>
+                            {isSaving ? <div className="scale-75 -mx-4 flex items-center justify-center"><Loader /></div> : <><Save className="w-4 h-4 mr-2" /> {initialData ? "Update Form" : "Deploy Form"}</>}
                         </RainbowButton>
                     </div>
                 </header>
