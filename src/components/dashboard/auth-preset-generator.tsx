@@ -16,11 +16,14 @@ import {
 } from "@/components/ui/select";
 import { getConnectorsAction, createAuthPresetAction, updateAuthPresetAction } from "@/app/actions/builder";
 import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
 
 export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSuccess?: () => void, initialPreset?: any }) {
     const router = useRouter();
     const [presetName, setPresetName] = React.useState(initialPreset?.name || "");
     const [isSaving, setIsSaving] = React.useState(false);
+    const [codeTab, setCodeTab] = React.useState<"html" | "react">("html");
+    const [headless, setHeadless] = React.useState(false);
 
     const [providers, setProviders] = React.useState({
         email: initialPreset?.providers?.email ?? true,
@@ -84,11 +87,16 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
     const generateSnippet = () => {
         const activeProviders = Object.keys(providers).filter(k => providers[k as keyof typeof providers]);
 
-        return `<!-- Place this where you want the Postpipe Auth UI to render -->
-<div id="postpipe-auth"></div>
+        const origin = typeof window !== 'undefined' ? window.location.origin : 'https://your-app.com';
+        const redirectDisplay = (!redirectUrl || redirectUrl === 'window.location.origin') ? 'window.location.origin' : `"${redirectUrl}"`;
+        const scriptUrl = `${origin}/api/public/cdn/auth.js${projectId ? `?projectId=${projectId}` : ''}`;
+
+        if (codeTab === "html") {
+            return `<!-- Place this where you want the Postpipe Auth UI to render -->
+${headless ? '<!-- Headless Mode enabled: You are responsible for the UI -->' : '<div id="postpipe-auth"></div>'}
 
 <!-- Include the Postpipe Auth CDN script -->
-<script src="${window.location.origin}/api/public/cdn/auth.js${projectId ? `?projectId=${projectId}` : ''}"></script>
+<script src="${scriptUrl}"></script>
 
 <!-- Initialize Postpipe Auth -->
 <script>
@@ -96,7 +104,8 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
         apiUrl: "${apiUrl}",
         projectId: "${projectId || 'YOUR_PROJECT_ID'}",
         providers: ${JSON.stringify(activeProviders)},
-        redirectUrl: ${(!redirectUrl || redirectUrl === 'window.location.origin') ? 'window.location.origin' : `"${redirectUrl}"`}${envFrontendUrlAlias ? `,\n        envFrontendUrlAlias: "${envFrontendUrlAlias}"` : ''}${projectAlias ? `,\n        projectAlias: "${projectAlias}"` : ''}${targetDatabase && targetDatabase !== 'default' ? `,\n        targetDatabase: "${targetDatabase}"` : ''}
+        headless: ${headless},
+        redirectUrl: ${redirectDisplay}${envFrontendUrlAlias ? `,\n        envFrontendUrlAlias: "${envFrontendUrlAlias}"` : ''}${projectAlias ? `,\n        projectAlias: "${projectAlias}"` : ''}${targetDatabase && targetDatabase !== 'default' ? `,\n        targetDatabase: "${targetDatabase}"` : ''}
     });
 
     // Handle Auth Events
@@ -109,6 +118,141 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
         console.error("Authentication Error:", error);
     });
 </script>`;
+        }
+
+        return `'use client';
+
+import { useEffect, useState } from 'react';
+
+/**
+ * 1. Add the Global CDN script to your layout/head:
+ * <script src="${scriptUrl}"></script>
+ */
+
+export default function PostpipeAuthProvider() {
+    ${headless ? 'const [user, setUser] = useState(null);\n    const [error, setError] = useState(null);' : ''}
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && (window as any).PostpipeAuth) {
+            (window as any).PostpipeAuth.init({
+                apiUrl: "${apiUrl}",
+                projectId: "${projectId || 'YOUR_PROJECT_ID'}",
+                providers: ${JSON.stringify(activeProviders)},
+                headless: ${headless},
+                redirectUrl: ${redirectDisplay}${envFrontendUrlAlias ? `,\n                envFrontendUrlAlias: "${envFrontendUrlAlias}"` : ''}${projectAlias ? `,\n                projectAlias: "${projectAlias}"` : ''}${targetDatabase && targetDatabase !== 'default' ? `,\n                targetDatabase: "${targetDatabase}"` : ''}
+            });
+
+            (window as any).PostpipeAuth.on("success", (user: any) => {
+                console.log("Authenticated User:", user);
+                ${headless ? 'setUser(user);' : ''}
+            });
+
+            ${headless ? '(window as any).PostpipeAuth.on("error", (err: any) => setError(err.message));' : ''}
+        }
+    }, []);
+
+    ${headless ? `
+    if (user) return <div>Welcome, {user.email}</div>;
+
+    return (
+        <form onSubmit={(e) => {
+            e.preventDefault();
+            const email = e.currentTarget.email.value;
+            const password = e.currentTarget.password.value;
+            (window as any).PostpipeAuth.loginWithEmail(email, password);
+        }}>
+            {error && <div style={{color: 'red'}}>{error}</div>}
+            <input name="email" type="email" placeholder="Email" required />
+            <input name="password" type="password" placeholder="Password" required />
+            <button type="submit">Log In</button>
+        </form>
+    );` : 'return <div id="postpipe-auth" />;' }
+}`;
+    };
+
+    const renderSnippet = () => {
+        const activeProvidersList = Object.keys(providers).filter(k => providers[k as keyof typeof providers]);
+        const providersListStr = JSON.stringify(activeProvidersList);
+        const projectIdDisplay = projectId || 'YOUR_PROJECT_ID';
+        const origin = typeof window !== 'undefined' ? window.location.origin : 'https://your-app.com';
+        const redirectDisplay = redirectUrl || origin;
+        const scriptUrl = `${origin}/api/public/cdn/auth.js${projectId ? `?projectId=${projectId}` : ''}`;
+
+        if (codeTab === "html") {
+            return (
+                <React.Fragment>
+                    <span className="text-[#7EE787]">&lt;!-- Place this where you want the Postpipe Auth UI to render --&gt;</span>{'\n'}
+                    {headless ? (
+                        <span className="text-[#7EE787]">&lt;!-- Headless Mode enabled: You are responsible for the UI --&gt;</span>
+                    ) : (
+                        <span className="text-[#89B4FA]">&lt;div id="postpipe-auth"&gt;&lt;/div&gt;</span>
+                    )}
+                    {'\n\n'}
+                    <span className="text-[#7EE787]">&lt;!-- Include the Postpipe Auth CDN script --&gt;</span>{'\n'}
+                    <span className="text-[#89B4FA]">&lt;script src="{scriptUrl}"&gt;&lt;/script&gt;</span>{'\n\n'}
+                    <span className="text-[#89B4FA]">&lt;script&gt;</span>{'\n'}
+                    <span className="text-white">    PostpipeAuth.init({'{'}</span>{'\n'}
+                    <span className="text-white">        apiUrl: "{apiUrl}",</span>{'\n'}
+                    <span className="text-white">        projectId: "{projectIdDisplay}",</span>{'\n'}
+                    <span className="text-white">        providers: {providersListStr},</span>{'\n'}
+                    <span className="text-white">        headless: {headless ? 'true' : 'false'},</span>{'\n'}
+                    <span className="text-white">        redirectUrl: "{redirectDisplay}"</span>{envFrontendUrlAlias ? `,\n        envFrontendUrlAlias: "${envFrontendUrlAlias}"` : ''}{projectAlias ? `,\n        projectAlias: "${projectAlias}"` : ''}{targetDatabase && targetDatabase !== 'default' ? `,\n        targetDatabase: "${targetDatabase}"` : ''}{'\n'}
+                    <span className="text-white">    {'}'});</span>{'\n\n'}
+                    <span className="text-[#7EE787]">    // Handle Auth Events</span>{'\n'}
+                    <span className="text-[#89B4FA]">    PostpipeAuth.on("success", (user) =&gt; {'{'}</span>{'\n'}
+                    <span className="text-[#89B4FA]">        console.log("Authenticated User:", user);</span>{'\n'}
+                    <span className="text-[#89B4FA]">    {'}'});</span>{'\n'}
+                    <span className="text-[#89B4FA]">&lt;/script&gt;</span>
+                </React.Fragment>
+            );
+        }
+
+        return (
+            <React.Fragment>
+                <span className="text-[#CBA6F7]">import</span> {'{'} <span className="text-[#89B4FA]">useEffect</span>{headless && <>, <span className="text-[#89B4FA]">useState</span></>} {'}'} <span className="text-[#CBA6F7]">from</span> <span className="text-[#A6E3A1]">'react'</span>;{'\n\n'}
+                <span className="text-[#CBA6F7]">export default function</span> <span className="text-[#89B4FA]">PostpipeAuthComponent</span>() {'{'}{'\n'}
+                {headless && (
+                    <React.Fragment>
+                        <span className="text-[#89B4FA]">    const [user, setUser] = useState(null);</span>{'\n'}
+                        <span className="text-[#89B4FA]">    const [error, setError] = useState(null);</span>{'\n\n'}
+                    </React.Fragment>
+                )}
+                <span className="text-[#89B4FA]">    useEffect(() =&gt; {'{'}</span>{'\n'}
+                <span className="text-[#89B4FA]">        if (typeof window !== 'undefined' &amp;&amp; (window as any).PostpipeAuth) {'{'}</span>{'\n'}
+                <span className="text-[#89B4FA]">            (window as any).PostpipeAuth.init({'{'}</span>{'\n'}
+                <span className="text-[#89B4FA]">                apiUrl: "{apiUrl}",</span>{'\n'}
+                <span className="text-[#89B4FA]">                projectId: "{projectIdDisplay}",</span>{'\n'}
+                <span className="text-[#89B4FA]">                providers: {providersListStr},</span>{'\n'}
+                <span className="text-[#89B4FA]">                headless: {headless ? 'true' : 'false'},</span>{'\n'}
+                <span className="text-[#89B4FA]">                redirectUrl: "{redirectDisplay}"</span>{envFrontendUrlAlias ? `,\n                envFrontendUrlAlias: "${envFrontendUrlAlias}"` : ''}{projectAlias ? `,\n                projectAlias: "${projectAlias}"` : ''}{targetDatabase && targetDatabase !== 'default' ? `,\n                targetDatabase: "${targetDatabase}"` : ''}{'\n'}
+                <span className="text-[#89B4FA]">            {'}'});</span>{'\n\n'}
+                <span className="text-[#89B4FA]">            (window as any).PostpipeAuth.on("success", (u: any) =&gt; {'{'}</span>{'\n'}
+                <span className="text-[#89B4FA]">                console.log("Success!", u);</span>{'\n'}
+                {headless && <span className="text-[#89B4FA]">                setUser(u);</span>}{'\n'}
+                <span className="text-[#89B4FA]">            {'}'});</span>{'\n'}
+                {headless && (
+                    <span className="text-[#89B4FA]">            (window as any).PostpipeAuth.on("error", (err: any) =&gt; setError(err.message));</span>
+                )}{'\n'}
+                <span className="text-[#89B4FA]">        {'}'}</span>{'\n'}
+                <span className="text-[#89B4FA]">    {'}'}, []);{'\n\n'}</span>
+                {headless ? (
+                    <React.Fragment>
+                        <span className="text-[#CBA6F7]">    if (user) return &lt;div&gt;Welcome!&lt;/div&gt;;</span>{'\n\n'}
+                        <span className="text-[#CBA6F7]">    return (</span>{'\n'}
+                        <span className="text-[#89B4FA]">        &lt;form onSubmit={'{'}(ev) =&gt; {'{'} ev.preventDefault(); (window as any).PostpipeAuth.loginWithEmail(ev.target.email.value, ev.target.password.value); {'}'}{'}'} &gt;</span>{'\n'}
+                        <span className="text-[#89B4FA]">            {'{'}error &amp;&amp; &lt;div style={'{'}{'{'} color: 'red' {'}'}{'}'} &gt; {'{'}error{'}'} &lt;/div&gt; {'}'}</span>{'\n'}
+                        <span className="text-[#89B4FA]">            &lt;input name="email" placeholder="Email" /&gt;</span>{'\n'}
+                        <span className="text-[#89B4FA]">            &lt;input name="password" type="password" /&gt;</span>{'\n'}
+                        <span className="text-[#89B4FA]">            &lt;button type="submit"&gt;Login&lt;/button&gt;</span>{'\n'}
+                        <span className="text-[#89B4FA]">        &lt;/form&gt;</span>{'\n'}
+                        <span className="text-[#CBA6F7]">    );</span>
+                    </React.Fragment>
+                ) : (
+                    <span className="text-[#CBA6F7]">    return &lt;div id="postpipe-auth" /&gt;;</span>
+                )}{'\n'}
+                {'}'}
+            </React.Fragment>
+        );
     };
 
     const copyToClipboard = () => {
@@ -178,7 +322,6 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Configuration Panel */}
             <div className="space-y-6">
                 <div className="bg-card dark:bg-white/[0.03] rounded-xl border border-border dark:border-white/5 p-6 shadow-sm space-y-6">
                     <div>
@@ -202,53 +345,48 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
                                     <div className="mt-2 bg-orange-100/50 dark:bg-orange-950/50 p-3 rounded-md text-xs font-mono space-y-1 border border-orange-200/50 dark:border-orange-900/50 overflow-x-auto selection:bg-orange-200 dark:selection:bg-orange-900 text-orange-900 dark:text-orange-200">
                                         {(() => {
                                             const getEnvKey = (key: string) => `${key}_${projectAlias}`;
-
                                             return (
-                                                <>
+                                                <React.Fragment>
                                                     <div className="text-orange-900/50 dark:text-orange-200/50"># Core Auth Settings</div>
                                                     <div>{getEnvKey('JWT_SECRET')}="<span className="opacity-50">your-super-secret-jwt-key</span>"</div>
                                                     <div>{envFrontendUrlAlias || 'FRONTEND_URL'}="<span className="opacity-50">https://your-app.com</span>"</div>
-
                                                     {providers.google && (
-                                                        <>
+                                                        <React.Fragment>
                                                             <div className="text-orange-900/50 dark:text-orange-200/50 mt-2"># Google OAuth</div>
                                                             <div>{getEnvKey('GOOGLE_CLIENT_ID')}="<span className="opacity-50">your-google-client-id</span>"</div>
                                                             <div>{getEnvKey('GOOGLE_CLIENT_SECRET')}="<span className="opacity-50">your-google-client-secret</span>"</div>
-                                                        </>
+                                                        </React.Fragment>
                                                     )}
-
                                                     {providers.github && (
-                                                        <>
+                                                        <React.Fragment>
                                                             <div className="text-orange-900/50 dark:text-orange-200/50 mt-2"># GitHub OAuth</div>
                                                             <div>{getEnvKey('GITHUB_CLIENT_ID')}="<span className="opacity-50">your-github-client-id</span>"</div>
                                                             <div>{getEnvKey('GITHUB_CLIENT_SECRET')}="<span className="opacity-50">your-github-client-secret</span>"</div>
-                                                        </>
+                                                        </React.Fragment>
                                                     )}
-
                                                     {providers.email && requireEmailVerification && (
-                                                        <>
+                                                        <React.Fragment>
                                                             <div className="text-orange-900/50 dark:text-orange-200/50 mt-2"># Email Provider Choice</div>
                                                             <div>{getEnvKey('EMAIL_PROVIDER')}="{emailProvider}"</div>
-
                                                             {emailProvider === 'resend' ? (
-                                                                <>
+                                                                <React.Fragment>
                                                                     <div className="text-orange-900/50 dark:text-orange-200/50 mt-2"># Resend Verification</div>
                                                                     <div>{getEnvKey('RESEND_API_KEY')}="<span className="opacity-50">your-resend-api-key</span>"</div>
                                                                     <div>{getEnvKey('RESEND_FROM_EMAIL')}="<span className="opacity-50">onboarding@resend.dev</span>"</div>
-                                                                </>
+                                                                </React.Fragment>
                                                             ) : (
-                                                                <>
+                                                                <React.Fragment>
                                                                     <div className="text-orange-900/50 dark:text-orange-200/50 mt-2"># Nodemailer (SMTP)</div>
                                                                     <div>{getEnvKey('SMTP_HOST')}="{smtpHost || '<span className="opacity-50">smtp.example.com</span>'}"</div>
                                                                     <div>{getEnvKey('SMTP_PORT')}="{smtpPort || '587'}"</div>
                                                                     <div>{getEnvKey('SMTP_USER')}="{smtpUser || '<span className="opacity-50">user@example.com</span>'}"</div>
                                                                     <div>{getEnvKey('SMTP_PASS')}="{smtpPass || '<span className="opacity-50">your-password</span>'}"</div>
                                                                     <div>{getEnvKey('SMTP_SECURE')}="{smtpPort === '465' ? 'true' : 'false'}"</div>
-                                                                </>
+                                                                </React.Fragment>
                                                             )}
-                                                        </>
+                                                        </React.Fragment>
                                                     )}
-                                                </>
+                                                </React.Fragment>
                                             );
                                         })()}
                                     </div>
@@ -396,6 +534,35 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
                     </div>
 
                     <div className="space-y-4 pt-4 border-t">
+                        <label className="text-sm font-medium flex items-center gap-2">
+                             <CheckCircle2 className={cn("h-4 w-4", headless ? "text-purple-500" : "text-muted-foreground")} />
+                             Configuration Mode
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                onClick={() => setHeadless(false)}
+                                className={cn(
+                                    "px-4 py-3 rounded-xl border text-left transition-all",
+                                    !headless ? "bg-blue-500/10 border-blue-500/40" : "bg-transparent border-border hover:border-muted-foreground/30"
+                                )}
+                            >
+                                <div className="font-bold text-xs mb-1">Managed UI</div>
+                                <div className="text-[10px] text-muted-foreground leading-tight">Drop-in auth screens</div>
+                            </button>
+                            <button
+                                onClick={() => setHeadless(true)}
+                                className={cn(
+                                    "px-4 py-3 rounded-xl border text-left transition-all",
+                                    headless ? "bg-purple-500/10 border-purple-500/40" : "bg-transparent border-border hover:border-muted-foreground/30"
+                                )}
+                            >
+                                <div className="font-bold text-xs mb-1">Headless</div>
+                                <div className="text-[10px] text-muted-foreground leading-tight">Custom frontend only</div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4 pt-4 border-t">
                         <div className="space-y-2">
                             <label className="text-sm font-medium flex items-center gap-2">
                                 <LinkIcon className="h-4 w-4 text-muted-foreground" />
@@ -495,13 +662,32 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
             {/* Snippet Preview Panel */}
             <div className="bg-[#0D1117] rounded-xl border border-[#30363D] overflow-hidden flex flex-col shadow-2xl">
                 <div className="flex items-center justify-between px-4 py-3 bg-[#161B22] border-b border-[#30363D]">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-4">
                         <div className="flex gap-1.5">
                             <div className="w-3 h-3 rounded-full bg-red-500/80" />
                             <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
                             <div className="w-3 h-3 rounded-full bg-green-500/80" />
                         </div>
-                        <span className="text-xs text-[#8B949E] font-mono ml-2">postpipe-auth-snippet.html</span>
+                        <div className="flex bg-[#0D1117] rounded-md p-0.5 border border-[#30363D]">
+                            <button
+                                onClick={() => setCodeTab("html")}
+                                className={cn(
+                                    "px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded transition-all",
+                                    codeTab === "html" ? "bg-[#30363D] text-white" : "text-[#8B949E] hover:text-white"
+                                )}
+                            >
+                                HTML Snippet
+                            </button>
+                            <button
+                                onClick={() => setCodeTab("react")}
+                                className={cn(
+                                    "px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded transition-all",
+                                    codeTab === "react" ? "bg-[#30363D] text-white" : "text-[#8B949E] hover:text-white"
+                                )}
+                            >
+                                React Component
+                            </button>
+                        </div>
                     </div>
                     <Button variant="ghost" size="sm" className="h-7 text-[#8B949E] hover:text-white hover:bg-[#30363D]" onClick={copyToClipboard}>
                         <Copy className="h-3.5 w-3.5 mr-1.5" />
@@ -512,29 +698,7 @@ export default function AuthPresetGenerator({ onSuccess, initialPreset }: { onSu
                 <div className="p-4 overflow-x-auto flex-1 text-[#E6EDF3]">
                     <pre className="text-sm font-mono leading-relaxed">
                         <code>
-                            <span className="text-[#7EE787]">&lt;!-- Place this where you want the Postpipe Auth UI to render --&gt;</span>
-                            {'\n'}
-                            <span className="text-[#89B4FA]">&lt;div</span> <span className="text-[#F38BA8]">id</span>=<span className="text-[#A6E3A1]">"postpipe-auth"</span><span className="text-[#89B4FA]">&gt;&lt;/div&gt;</span>
-                            {'\n\n'}
-                            <span className="text-[#7EE787]">&lt;!-- Include the Postpipe Auth CDN script --&gt;</span>
-                            {'\n'}
-                            <span className="text-[#89B4FA]">&lt;script</span> <span className="text-[#F38BA8]">src</span>=<span className="text-[#A6E3A1]">"{`${window.location.origin}/api/public/cdn/auth.js${projectId ? `?projectId=${projectId}` : ''}`}"</span><span className="text-[#89B4FA]">&gt;&lt;/script&gt;</span>
-                            {'\n\n'}
-                            <span className="text-[#89B4FA]">&lt;script&gt;</span>{'\n'}
-                            <span className="text-[#89B4FA]">PostpipeAuth</span>.<span className="text-[#89B4FA]">init</span>({`{`}{'\n'}
-                            <span className="text-[#89B4FA]">    apiUrl</span>: <span className="text-[#A6E3A1]">"{apiUrl}"</span>,{'\n'}
-                            <span className="text-[#89B4FA]">    projectId</span>: <span className="text-[#A6E3A1]">"{projectId || 'YOUR_PROJECT_ID'}"</span>,{'\n'}
-                            <span className="text-[#89B4FA]">    providers</span>: <span className="text-[#F9E2AF]">{JSON.stringify(Object.keys(providers).filter(k => providers[k as keyof typeof providers]))}</span>,{'\n'}
-                            <span className="text-[#89B4FA]">    redirectUrl</span>: {redirectUrl ? <span className="text-[#A6E3A1]">"{redirectUrl}"</span> : <span className="text-[#F9E2AF]">window.location.href</span>}{envFrontendUrlAlias ? `,\n    envFrontendUrlAlias: "${envFrontendUrlAlias}"` : ''}{projectAlias ? `,\n    projectAlias: "${projectAlias}"` : ''}{targetDatabase && targetDatabase !== 'default' ? `,\n    targetDatabase: "${targetDatabase}"` : ''}{'\n'}
-                            {`}`});{'\n\n'}
-                            <span className="text-[#7EE787]">// Handle Auth Events</span>{'\n'}
-                            <span className="text-[#89B4FA]">PostpipeAuth</span>.<span className="text-[#89B4FA]">on</span>(<span className="text-[#A6E3A1]">"success"</span>, (<span className="text-[#F38BA8]">user</span>) <span className="text-[#CBA6F7]">=&gt;</span> {`{`}{'\n'}
-                            <span className="text-[#89B4FA]">    console</span>.<span className="text-[#89B4FA]">log</span>(<span className="text-[#A6E3A1]">"Authenticated User:"</span>, user);{'\n'}
-                            {`}`});{'\n\n'}
-                            <span className="text-[#89B4FA]">PostpipeAuth</span>.<span className="text-[#89B4FA]">on</span>(<span className="text-[#A6E3A1]">"error"</span>, (<span className="text-[#F38BA8]">error</span>) <span className="text-[#CBA6F7]">=&gt;</span> {`{`}{'\n'}
-                            <span className="text-[#89B4FA]">    console</span>.<span className="text-[#89B4FA]">error</span>(<span className="text-[#A6E3A1]">"Authentication Error:"</span>, error);{'\n'}
-                            {`}`});{'\n'}
-                            <span className="text-[#89B4FA]">&lt;/script&gt;</span>
+                            {renderSnippet()}
                         </code>
                     </pre>
                 </div>

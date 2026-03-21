@@ -9,9 +9,12 @@ export const metadata: Metadata = {
     title: 'Overview',
 };
 
+import { getAuthPresetsAction } from '@/app/actions/builder';
+
 async function OverviewContent() {
     const { forms, connectors, systems } = await getDashboardData();
-    return <OverviewClient forms={forms} connectors={connectors} systems={systems} />;
+    const presets = await getAuthPresetsAction();
+    return <OverviewClient forms={forms} connectors={connectors} systems={systems} authPresets={presets} />;
 }
 
 export default function DashboardPage() {

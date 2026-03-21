@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
-    Server, FileText, Key, Activity, Terminal, Zap,
+    Server, FileText, Key, Activity, Terminal, Zap, Shield,
     ArrowRight, Plus, Database, Globe, GitBranch, Clock,
-    TrendingUp, ChevronRight, ExternalLink
+    TrendingUp, ChevronRight, ExternalLink, Rocket, Check
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -15,16 +15,11 @@ interface OverviewClientProps {
     forms: any[];
     connectors: any[];
     systems: any[];
+    authPresets: any[];
 }
 
-export default function OverviewClient({ forms, connectors, systems = [] }: OverviewClientProps) {
-    const copyCliCommand = () => {
-        navigator.clipboard.writeText("npx create-postpipe-app@latest");
-        toast({
-            title: "Copied to clipboard",
-            description: "CLI command copied to clipboard",
-        });
-    };
+export default function OverviewClient({ forms, connectors, systems = [], authPresets = [] }: OverviewClientProps) {
+
 
     const recentForms = [...forms]
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -68,16 +63,16 @@ export default function OverviewClient({ forms, connectors, systems = [] }: Over
             trend: "All healthy",
         },
         {
-            label: "Requests",
-            value: 0,
-            sub: "Analytics soon",
-            icon: Activity,
+            label: "Auth Presets",
+            value: authPresets.length,
+            sub: "Custom auth flows",
+            icon: Shield,
             color: "text-amber-500 dark:text-amber-400",
             bg: "bg-amber-500/10",
             border: "border-amber-200 dark:border-amber-500/20",
             glow: "shadow-amber-500/10",
-            href: "#",
-            trend: "Coming soon",
+            href: "/dashboard/forms?tab=presets",
+            trend: "All secure",
         },
     ];
 
@@ -113,17 +108,16 @@ export default function OverviewClient({ forms, connectors, systems = [] }: Over
             href: "/dashboard/connectors",
         },
         {
-            label: "Copy CLI Command",
-            desc: "Bootstrap from your terminal",
-            icon: Terminal,
-            iconBg: "bg-neutral-500/10",
-            iconColor: "text-neutral-500",
-            hoverBorder: "hover:border-neutral-300 dark:hover:border-neutral-500/30",
-            hoverBg: "hover:bg-neutral-50/50 dark:hover:bg-neutral-500/5",
-            onClick: copyCliCommand,
-            href: undefined,
+            label: "Generate Auth Preset",
+            desc: "Setup authentication in minutes",
+            icon: Key,
+            iconBg: "bg-purple-500/10",
+            iconColor: "text-purple-500",
+            hoverBorder: "hover:border-purple-300 dark:hover:border-purple-500/30",
+            hoverBg: "hover:bg-purple-50/50 dark:hover:bg-purple-500/5",
+            href: "/dashboard/forms?tab=presets&action=new-preset",
         },
-    ];
+    ] as any[];
 
     return (
         <div className="flex flex-col gap-10">
@@ -131,6 +125,59 @@ export default function OverviewClient({ forms, connectors, systems = [] }: Over
                 title="Overview"
                 subtitle="Welcome back! Here's what's happening with your infrastructure."
             />
+
+            {/* ── Guided Setup ── */}
+            {forms.length === 0 && (
+                <div className="rounded-2xl border border-primary/20 bg-primary/5 p-6 md:p-8 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <Rocket className="h-24 w-24 text-primary" />
+                    </div>
+                    <div className="relative z-10 max-w-2xl">
+                        <h2 className="text-2xl font-bold mb-2 flex items-center gap-3">
+                            🚀 Welcome to PostPipe! 
+                            <span className="text-xs font-normal bg-primary/10 text-primary px-3 py-1 rounded-full uppercase tracking-wider">Newbie Guide</span>
+                        </h2>
+                        <p className="text-muted-foreground mb-6">
+                            Let&apos;s get your infrastructure up and running. Follow these steps to create your first backend connection.
+                        </p>
+                        
+                        <div className="grid sm:grid-cols-2 gap-4 mb-6">
+                            {[
+                                { title: "Step 1: Choose Path", desc: "Static Connector or Dynamic CLI", done: true },
+                                { title: "Step 2: Initialize", desc: "Setup your first system", done: systems.length > 0 },
+                                { title: "Step 3: Create Form", desc: "Map your frontend fields", done: forms.length > 0 },
+                                { title: "Step 4: Go Live", desc: "Embed and collect data", done: false },
+                            ].map((s, i) => (
+                                <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-background/50 border border-border/50">
+                                    <div className={cn(
+                                        "h-6 w-6 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold",
+                                        s.done ? "bg-emerald-500/20 text-emerald-500" : "bg-primary/20 text-primary"
+                                    )}>
+                                        {s.done ? <Check className="h-3 w-3" /> : i + 1}
+                                    </div>
+                                    <div>
+                                        <div className="text-sm font-semibold leading-tight">{s.title}</div>
+                                        <div className="text-[11px] text-muted-foreground">{s.desc}</div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        
+                        <div className="flex flex-wrap gap-3">
+                            <Link href="/static">
+                                <Button className="gap-2 font-bold">
+                                    Setup Static Connector <ArrowRight className="h-4 w-4" />
+                                </Button>
+                            </Link>
+                            <Link href="/explore">
+                                <Button variant="outline" className="gap-2 font-bold">
+                                    Explore CLI Marketplace
+                                </Button>
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ── Stat Cards ── */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

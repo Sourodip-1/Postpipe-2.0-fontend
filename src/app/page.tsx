@@ -16,6 +16,7 @@ import { HeroParticles } from '@/components/layout/hero-particles';
 import { cn } from '@/lib/utils';
 import { GlowingEffect } from '@/components/ui/glowing-effect';
 import { RadialIntro } from '@/components/ui/radial-intro';
+import { PathSelection } from '@/components/layout/path-selection';
 
 const heroImage = PlaceHolderImages.find((img) => img.id === 'hero-image');
 
@@ -84,6 +85,8 @@ export default function Home() {
         />
         <HeroParticles />
       </section>
+
+      <PathSelection />
 
       <section id="features" className="bg-background-muted py-20 md:py-32">
         <div className="container mx-auto px-4">

@@ -6,6 +6,20 @@ description: Connect your database to PostPipe.in using the PostPipe Connector.
 > [!TIP] > **Ready to go securely?**  
 > PostPipe's Static Connector creates an encrypted tunnel between your database and our platform. No firewall changes needed.
 
+## 📊 Visual Flow: How Data Moves
+
+```mermaid
+graph LR
+    A[Frontend Form] -- "1. POST Payload" --> B(PostPipe SaaS)
+    B -- "2. Signature Header" --> C{PostPipe Connector}
+    C -- "3. Verify Signature" --> C
+    C -- "4. Save to DB" --> D[(Your Database)]
+    
+    style B fill:#6366f1,color:#fff
+    style C fill:#4f46e5,color:#fff
+    style D fill:#10b981,color:#fff
+```
+
 ## ⚡ Prerequisites
 
 Before we blast off, ensure you have the following:

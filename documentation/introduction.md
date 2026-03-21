@@ -9,6 +9,7 @@ Before you dive in, follow this sequence for the fastest setup:
 
 1.  [ ] **Create an Account**: Sign up at [PostPipe.in](https://postpipe.in).
 2.  [ ] **Choose Your Path**: Decide between **Static (Connector)** or **Dynamic (CLI)**.
+    -   *Not sure which one? Check the [Choosing Your Path Guide](/docs/guides/choosing-a-path).*
 3.  [ ] **Connect Your DB**: Follow the guide for your chosen path below.
 4.  [ ] **Create a Form**: Use the Dashboard to map your frontend to your DB.
 
@@ -39,4 +40,5 @@ Use this if you want to build **new** NextJS Backends from scratch using our pre
 
 - **[How It Works](/docs/how-it-works)**: Deep dive into the hybrid architecture.
 - **[System Architecture](/docs/architecture)**: Detailed monorepo and data flow breakdown.
+- **[Auth Presets & Aliases](/docs/guides/auth-presets-and-aliases)**: Master the authentication flow and environment mapping.
 - **[Security](/docs/security)**: Learn about our Zero-Trust signature verification.

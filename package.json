@@ -61,6 +61,7 @@
     "gsap": "^3.12.5",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.577.0",
+    "mermaid": "^11.13.0",
     "mongodb": "^7.1.0",
     "mongoose": "^9.0.2",
     "motion": "^12.34.3",

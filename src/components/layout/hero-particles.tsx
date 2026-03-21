@@ -36,7 +36,17 @@ export function HeroParticles() {
           />
         </div>
         <div className="flex flex-col sm:flex-row gap-4 items-center mt-4 w-full sm:w-auto">
-          <div onClick={() => router.push(isAuthenticated ? "/dashboard" : "/login")} className="cursor-pointer w-full sm:w-auto">
+          <div 
+            onClick={() => {
+              const element = document.getElementById('choose-path');
+              if (element) {
+                element.scrollIntoView({ behavior: 'smooth' });
+              } else {
+                router.push(isAuthenticated ? "/dashboard" : "/login");
+              }
+            }} 
+            className="cursor-pointer w-full sm:w-auto"
+          >
             <AnimatedButton className="w-full sm:w-auto">Get Started</AnimatedButton>
           </div>
           <Link href="https://github.com/Sourodip-1/Postpipe-2.0-fontend" target="_blank" className="w-full sm:w-auto">

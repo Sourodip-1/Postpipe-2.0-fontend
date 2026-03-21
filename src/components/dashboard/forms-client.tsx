@@ -39,7 +39,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { deleteFormAction, duplicateFormAction, toggleFormStatusAction, deleteAuthPresetAction } from "@/app/actions/dashboard";
 import IsoLevelWarp from "@/components/ui/isometric-wave-grid-background";
 import { FormSearchBar } from "@/components/ui/animated-search-bar";
@@ -73,6 +73,20 @@ export default function FormsClient({ initialForms = [], initialPresets = [] }: 
     const [copiedId, setCopiedId] = React.useState<string | null>(null);
     const [searchExpanded, setSearchExpanded] = React.useState(false);
 
+
+    const searchParams = useSearchParams();
+
+    React.useEffect(() => {
+        const tab = searchParams.get('tab');
+        if (tab === 'presets') {
+            // Since we're using Radix/Shadcn Tabs, we might need to control the state if we want to programmatically switch.
+            // But if we just want to open the 'isCreatingPreset' dialog if an action is specified:
+            const action = searchParams.get('action');
+            if (action === 'new-preset') {
+                setIsCreatingPreset(true);
+            }
+        }
+    }, [searchParams]);
 
     React.useEffect(() => { setPresets(initialPresets); }, [initialPresets]);
 
@@ -254,6 +268,7 @@ export default function FormsClient({ initialForms = [], initialPresets = [] }: 
                                 { label: "Live", value: activeForms, icon: Zap, color: "text-emerald-600 dark:text-emerald-400" },
                                 { label: "Submissions", value: totalSubmissions, icon: Activity, color: "text-sky-600 dark:text-sky-400" },
                                 { label: "Connectors", value: uniqueConnectors.length, icon: Database, color: "text-violet-600 dark:text-violet-400" },
+                                { label: "Auth Presets", value: presets.length, icon: Shield, color: "text-amber-600 dark:text-amber-400" },
                             ].map(s => (
                                 <div key={s.label} className="flex items-center gap-2.5 rounded-lg border border-black/10 dark:border-white/10 bg-white/50 dark:bg-black/30 backdrop-blur-md px-4 py-2.5 hover:bg-white/70 dark:hover:bg-black/40 transition-all">
                                     <s.icon className={cn("h-4 w-4", s.color)} />
@@ -266,7 +281,7 @@ export default function FormsClient({ initialForms = [], initialPresets = [] }: 
                 </div>
 
                 {/* ══ TABS ══ */}
-                <Tabs defaultValue="endpoints" className="w-full">
+                <Tabs defaultValue={searchParams.get('tab') === 'presets' ? 'presets' : 'endpoints'} className="w-full">
                     <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
                         <TabsList className="bg-muted dark:bg-white/[0.06] rounded-lg h-10 p-1 gap-1">
                             <TabsTrigger value="endpoints" className="rounded-lg text-xs font-semibold data-[state=active]:bg-background dark:data-[state=active]:bg-white/10 data-[state=active]:text-neutral-900 dark:data-[state=active]:text-white data-[state=active]:shadow-sm text-muted-foreground px-4 h-8 transition-all">

@@ -664,22 +664,22 @@ ${opts.map(o => `          <option value="${o}">${o}</option>`).join('\n')}
 
                                 {/* BUILD TAB */}
                                 {activeTab === 'build' && (
-                                    <div className="space-y-6 animate-in fade-in slide-in-from-left-2 duration-500">
-                                        <div className="flex items-center justify-between mb-2">
+                                    <div className="space-y-6">
+                                        <div className="flex items-center justify-between mb-6">
                                             <div>
                                                 <h2 className="text-sm font-semibold text-white">Schema Definition</h2>
-                                                <p className="text-xs text-neutral-400 mt-1">Configure the structure of your data payload.</p>
+                                                <p className="text-[11px] text-neutral-400 mt-0.5">Configure the structure of your data payload.</p>
                                             </div>
                                             <Button
                                                 size="icon"
                                                 variant="outline"
                                                 onClick={addField}
-                                                className={`h-8 w-8 rounded-lg border-white/10 bg-white/5 hover:bg-white/10 text-white shadow-sm transition-all duration-300 ${addPulse
+                                                className={`h-9 w-9 rounded-xl border-white/10 bg-white/5 hover:bg-white/10 text-white shadow-lg transition-all duration-300 ${addPulse
                                                     ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400 scale-95"
-                                                    : ""
+                                                    : "hover:scale-110 hover:border-primary/50"
                                                     }`}
                                             >
-                                                {addPulse ? <Check className="h-4 w-4 text-emerald-400" /> : <Plus className="h-4 w-4" />}
+                                                {addPulse ? <Check className="h-4 w-4 text-emerald-400" /> : <Plus className="h-5 w-5" />}
                                             </Button>
                                         </div>
 
@@ -907,6 +907,21 @@ CLOUDINARY_URL=cloudinary://...`}
                                 )}
                             </div>
                         </div>
+
+                        {/* Floating Action Button for Add Field */}
+                        {activeTab === 'build' && (
+                            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-500 pointer-events-none">
+                                <Button
+                                    onClick={addField}
+                                    className="h-12 px-6 rounded-2xl bg-primary hover:bg-primary/90 text-white shadow-[0_0_25px_rgba(37,99,235,0.4)] border border-white/10 flex items-center gap-2 pointer-events-auto transition-all hover:scale-105 active:scale-95 group"
+                                >
+                                    <div className="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center group-hover:rotate-90 transition-transform duration-300">
+                                        <Plus className="w-4 h-4" />
+                                    </div>
+                                    <span className="font-semibold text-sm tracking-wide">Add New Field</span>
+                                </Button>
+                            </div>
+                        )}
                     </div>
 
                     {/* Right Panel: Live Preview Canvas */}

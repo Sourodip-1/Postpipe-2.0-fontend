@@ -7,7 +7,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { AuthButton } from '../layout/auth-button';
-import { Logo } from '../icons/logo';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 
 
@@ -23,7 +22,6 @@ import { Menu } from 'lucide-react';
 export function Header2() {
 	const scrolled = useScroll(10);
 	const pathname = usePathname();
-	const isExplore = pathname?.startsWith("/explore");
 	const [isOpen, setIsOpen] = React.useState(false);
 
 	const links = [
@@ -58,8 +56,10 @@ export function Header2() {
 							{link.label}
 						</Link>
 					))}
-					<AuthButton />
-					<ThemeToggle />
+					<div className="flex items-center gap-3 ml-2 border-l pl-4 border-border/50">
+						<AuthButton />
+						<ThemeToggle />
+					</div>
 				</div>
 
 				{/* Mobile Menu */}
@@ -87,8 +87,8 @@ export function Header2() {
 										{link.label}
 									</Link>
 								))}
-								<div className="pt-4 mt-4 border-t">
-									<div className="flex justify-start">
+								<div className="pt-4 mt-4 border-t flex flex-col gap-3">
+									<div className="flex justify-between items-center">
 										<AuthButton />
 									</div>
 								</div>

@@ -21,7 +21,8 @@ export async function GET(req: Request) {
                 redirectUrl: window.location.origin,
                 envFrontendUrlAlias: null,
                 projectAlias: null,
-                apiUrl: 'http://localhost:3002/api/auth'
+                apiUrl: 'http://localhost:3002/api/auth',
+                headless: false
             };
             this.listeners = {
                 success: [],
@@ -47,7 +48,10 @@ export async function GET(req: Request) {
             this._ppAction = params.get('pp_action');
             this._ppToken = params.get('token');
 
-            this.injectStyles();
+            if (!this.config.headless) {
+                this.injectStyles();
+            }
+            
             this.checkOAuthCallback();
             
             // If we have a token, auto-introspect
@@ -55,8 +59,10 @@ export async function GET(req: Request) {
                 this.me();
             }
 
-            // Always try to render if an action is present
-            this.render();
+            // Always try to render if an action is present and we're not headless
+            if (!this.config.headless) {
+                this.render();
+            }
         }
 
         on(event, callback) {
@@ -73,7 +79,7 @@ export async function GET(req: Request) {
 
         async loginWithEmail(email, password) {
             try {
-                this.setLoading(true);
+                if (!this.config.headless) this.setLoading(true);
                 const response = await fetch(\`\${this.config.apiUrl}/login\`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -92,7 +98,7 @@ export async function GET(req: Request) {
                 if (response.status === 403 && data.requiresOtp) {
                     this._pendingEmail = email;
                     this._mode = 'otp';
-                    this.render();
+                    if (!this.config.headless) this.render();
                     return;
                 }
 
@@ -102,16 +108,16 @@ export async function GET(req: Request) {
                 this.setAuthToken(data.token);
                 this.handleRedirect();
             } catch (err) {
-                this.showError(err.message);
+                if (!this.config.headless) this.showError(err.message);
                 this.emit('error', err);
             } finally {
-                this.setLoading(false);
+                if (!this.config.headless) this.setLoading(false);
             }
         }
 
         async registerWithEmail(name, email, password) {
             try {
-                this.setLoading(true);
+                if (!this.config.headless) this.setLoading(true);
                 const response = await fetch(\`\${this.config.apiUrl}/register\`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -130,25 +136,25 @@ export async function GET(req: Request) {
                 if (response.status === 201 && data.requiresOtp) {
                     this._pendingEmail = email;
                     this._mode = 'otp';
-                    this.render();
+                    if (!this.config.headless) this.render();
                     return;
                 }
 
                 if (!response.ok) throw new Error(data.message || 'Registration failed');
                 
-                this.showSuccess(data.message || 'Success! Check your email.');
+                if (!this.config.headless) this.showSuccess(data.message || 'Success! Check your email.');
                 this.emit('success', data.user);
             } catch (err) {
-                this.showError(err.message);
+                if (!this.config.headless) this.showError(err.message);
                 this.emit('error', err);
             } finally {
-                this.setLoading(false);
+                if (!this.config.headless) this.setLoading(false);
             }
         }
 
         async resetPassword(newPassword) {
             try {
-                this.setLoading(true);
+                if (!this.config.headless) this.setLoading(true);
                 const response = await fetch(\`\${this.config.apiUrl}/reset-password\`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -165,12 +171,12 @@ export async function GET(req: Request) {
                 if (!response.ok) throw new Error(data.message || 'Reset failed');
                 
                 this._ppAction = 'reset-success';
-                this.render();
+                if (!this.config.headless) this.render();
             } catch (err) {
-                this.showError(err.message);
+                if (!this.config.headless) this.showError(err.message);
                 this.emit('error', err);
             } finally {
-                this.setLoading(false);
+                if (!this.config.headless) this.setLoading(false);
             }
         }
 
@@ -191,11 +197,11 @@ export async function GET(req: Request) {
                 if (!response.ok) throw new Error(data.message || 'Verification failed');
                 
                 this._ppAction = 'verify-success';
-                this.render();
+                if (!this.config.headless) this.render();
             } catch (err) {
                 this._ppAction = 'verify-error';
                 this._errorMsg = err.message;
-                this.render();
+                if (!this.config.headless) this.render();
             }
         }
 
@@ -218,10 +224,13 @@ export async function GET(req: Request) {
 
         async verifyOtp() {
             const otp = document.getElementById('pp-otp')?.value;
-            if (!otp || otp.length !== 6) return this.showError('Enter a valid 6-digit code.');
+            if (!otp || otp.length !== 6) {
+                if (!this.config.headless) return this.showError('Enter a valid 6-digit code.');
+                throw new Error('Enter a valid 6-digit code.');
+            }
 
             try {
-                this.setLoading(true);
+                if (!this.config.headless) this.setLoading(true);
                 const response = await fetch(\`\${this.config.apiUrl}/verify-otp\`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -242,18 +251,21 @@ export async function GET(req: Request) {
                 this.handleRedirect();
                 
                 this._mode = 'login';
-                this.showSuccess('Email verified successfully! You can now sign in.');
-                this.render();
+                if (!this.config.headless) {
+                    this.showSuccess('Email verified successfully! You can now sign in.');
+                    this.render();
+                }
             } catch (err) {
-                this.showError(err.message);
+                if (!this.config.headless) this.showError(err.message);
+                this.emit('error', err);
             } finally {
-                this.setLoading(false);
+                if (!this.config.headless) this.setLoading(false);
             }
         }
 
         async resendOtp() {
             try {
-                this.setLoading(true);
+                if (!this.config.headless) this.setLoading(true);
                 const response = await fetch(\`\${this.config.apiUrl}/resend-otp\`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -267,17 +279,18 @@ export async function GET(req: Request) {
 
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.message || 'Failed to resend');
-                this.showSuccess('New code sent to your email!');
+                if (!this.config.headless) this.showSuccess('New code sent to your email!');
             } catch (err) {
-                this.showError(err.message);
+                if (!this.config.headless) this.showError(err.message);
+                this.emit('error', err);
             } finally {
-                this.setLoading(false);
+                if (!this.config.headless) this.setLoading(false);
             }
         }
 
         async forgotPasswordWithEmail(email) {
             try {
-                this.setLoading(true);
+                if (!this.config.headless) this.setLoading(true);
                 const response = await fetch(\`\${this.config.apiUrl}/forgot-password\`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -291,11 +304,12 @@ export async function GET(req: Request) {
                 });
 
                 const data = await response.json();
-                this.showSuccess("If the account exists, a reset link has been sent.");
+                if (!this.config.headless) this.showSuccess("If the account exists, a reset link has been sent.");
             } catch (err) {
-                this.showError(err.message);
+                if (!this.config.headless) this.showError(err.message);
+                this.emit('error', err);
             } finally {
-                this.setLoading(false);
+                if (!this.config.headless) this.setLoading(false);
             }
         }
 

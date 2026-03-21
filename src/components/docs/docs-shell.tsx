@@ -19,13 +19,18 @@ export default function DocsShell({
 }: {
     children: React.ReactNode;
 }) {
-    const [open, setOpen] = useState(false);
+    const [open, setOpen] = useState(true);
 
     // Docs Navigation Items
     const navItems = [
         {
             label: "Introduction",
             href: "/docs/introduction",
+            icon: <Book className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
+        },
+        {
+            label: "Choosing Your Path",
+            href: "/docs/guides/choosing-a-path",
             icon: <Book className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
         },
         {
@@ -37,6 +42,11 @@ export default function DocsShell({
             label: "Dynamic CLI",
             href: "/docs/guides/cli-components",
             icon: <Terminal className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
+        },
+        {
+            label: "Auth Presets & Aliases",
+            href: "/docs/guides/auth-presets-and-aliases",
+            icon: <ShieldCheck className="text-emerald-500 dark:text-emerald-400 h-5 w-5 flex-shrink-0" />
         },
         {
             label: "How It Works",
