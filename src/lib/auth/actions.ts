@@ -21,7 +21,10 @@ export async function signup(prevState: any, formData: FormData): Promise<AuthSt
     const validated = SignupSchema.safeParse(rawData);
 
     if (!validated.success) {
-        return { success: false, message: 'Validation failed', errors: validated.error.flatten().fieldErrors };
+        const errors = validated.error.flatten().fieldErrors;
+        const firstErrorDetails = Object.values(errors).flat();
+        const firstError = firstErrorDetails.length > 0 ? firstErrorDetails[0] : 'Please check your inputs';
+        return { success: false, message: String(firstError), errors };
     }
 
     const { name, email, password } = validated.data;
@@ -68,7 +71,10 @@ export async function login(prevState: any, formData: FormData): Promise<AuthSta
     const validated = LoginSchema.safeParse(rawData);
 
     if (!validated.success) {
-        return { success: false, message: 'Validation failed', errors: validated.error.flatten().fieldErrors };
+        const errors = validated.error.flatten().fieldErrors;
+        const firstErrorDetails = Object.values(errors).flat();
+        const firstError = firstErrorDetails.length > 0 ? firstErrorDetails[0] : 'Please check your inputs';
+        return { success: false, message: String(firstError), errors };
     }
 
     const { email, password } = validated.data;
@@ -140,7 +146,10 @@ export async function forgotPassword(prevState: any, formData: FormData): Promis
     const validated = ForgotPasswordSchema.safeParse(rawData);
 
     if (!validated.success) {
-        return { success: false, message: 'Validation failed', errors: validated.error.flatten().fieldErrors };
+        const errors = validated.error.flatten().fieldErrors;
+        const firstErrorDetails = Object.values(errors).flat();
+        const firstError = firstErrorDetails.length > 0 ? firstErrorDetails[0] : 'Please check your inputs';
+        return { success: false, message: String(firstError), errors };
     }
 
     const { email } = validated.data;
@@ -176,7 +185,10 @@ export async function resetPassword(prevState: any, formData: FormData): Promise
     const validated = ResetPasswordSchema.safeParse(rawData);
 
     if (!validated.success) {
-        return { success: false, message: 'Validation failed', errors: validated.error.flatten().fieldErrors };
+        const errors = validated.error.flatten().fieldErrors;
+        const firstErrorDetails = Object.values(errors).flat();
+        const firstError = firstErrorDetails.length > 0 ? firstErrorDetails[0] : 'Please check your inputs';
+        return { success: false, message: String(firstError), errors };
     }
 
     const { token, password } = validated.data;
@@ -306,7 +318,10 @@ export async function updateProfile(prevState: any, formData: FormData): Promise
     const validated = UpdateProfileSchema.safeParse(rawData);
 
     if (!validated.success) {
-        return { success: false, message: 'Validation failed', errors: validated.error.flatten().fieldErrors };
+        const errors = validated.error.flatten().fieldErrors;
+        const firstErrorDetails = Object.values(errors).flat();
+        const firstError = firstErrorDetails.length > 0 ? firstErrorDetails[0] : 'Please check your inputs';
+        return { success: false, message: String(firstError), errors };
     }
 
     const { name, image } = validated.data;

@@ -189,6 +189,7 @@ PasswordInput.displayName = "PasswordInput";
 
 import { useRouter } from "next/navigation";
 import { login, signup, resendVerification, forgotPassword } from "@/lib/auth/actions";
+import Loader from "@/components/ui/loader";
 
 function SignInForm({ setView }: { setView: (v: "signin" | "signup" | "forgot") => void }) {
     const router = useRouter();
@@ -224,7 +225,7 @@ function SignInForm({ setView }: { setView: (v: "signin" | "signup" | "forgot") 
 }
 
 function SignUpForm({ setView }: { setView: (v: "signin" | "signup" | "forgot") => void }) {
-    const [state, formAction] = useActionState(signup, { success: false, message: "" });
+    const [state, formAction, isPending] = useActionState(signup, { success: false, message: "" });
     const [resendState, resendAction] = useActionState(resendVerification, { success: false, message: "" });
     const [submittedEmail, setSubmittedEmail] = useState("");
 
@@ -265,16 +266,30 @@ function SignUpForm({ setView }: { setView: (v: "signin" | "signup" | "forgot") 
     }
 
     return (
-        <form action={formAction} autoComplete="on" className="flex flex-col gap-8">
+        <form action={formAction} autoComplete="on" className="flex flex-col gap-8 relative">
             <div className="flex flex-col items-center gap-2 text-center">
                 <h1 className="text-2xl font-bold">Create an account</h1>
                 <p className="text-balance text-sm text-muted-foreground">Enter your details below to sign up</p>
             </div>
             <div className="grid gap-4">
-                <div className="grid gap-1"><Label htmlFor="name">Full Name</Label><Input id="name" name="name" type="text" placeholder="John Doe" required autoComplete="name" /></div>
-                <div className="grid gap-2"><Label htmlFor="email">Email</Label><Input id="email" name="email" type="email" placeholder="m@example.com" required autoComplete="email" value={emailInput} onChange={(e) => setEmailInput(e.target.value)} /></div>
-                <PasswordInput name="password" label="Password" required autoComplete="new-password" placeholder="Password" />
-                <PasswordInput name="confirmPassword" label="Confirm Password" required autoComplete="new-password" placeholder="Confirm Password" />
+                <div className="grid gap-1">
+                    <Label htmlFor="name">Full Name</Label>
+                    <Input id="name" name="name" type="text" placeholder="John Doe" required autoComplete="name" />
+                    {state.errors?.name && <p className="text-xs text-red-500">{state.errors.name[0]}</p>}
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input id="email" name="email" type="email" placeholder="m@example.com" required autoComplete="email" value={emailInput} onChange={(e) => setEmailInput(e.target.value)} />
+                    {state.errors?.email && <p className="text-xs text-red-500">{state.errors.email[0]}</p>}
+                </div>
+                <div className="grid gap-2">
+                    <PasswordInput name="password" label="Password" required autoComplete="new-password" placeholder="Password" />
+                    {state.errors?.password && <p className="text-xs text-red-500">{state.errors.password[0]}</p>}
+                </div>
+                <div className="grid gap-2">
+                    <PasswordInput name="confirmPassword" label="Confirm Password" required autoComplete="new-password" placeholder="Confirm Password" />
+                    {state.errors?.confirmPassword && <p className="text-xs text-red-500">{state.errors.confirmPassword[0]}</p>}
+                </div>
 
                 {state.message && (
                     <p className={cn("text-sm text-center font-medium", state.success ? "text-green-500" : "text-red-500")}>
@@ -282,7 +297,9 @@ function SignUpForm({ setView }: { setView: (v: "signin" | "signup" | "forgot") 
                     </p>
                 )}
 
-                <Button type="submit" variant="default" className="mt-2 text-white dark:text-black">Sign Up</Button>
+                <Button type="submit" variant="default" className="mt-2 text-white dark:text-black overflow-hidden" disabled={isPending}>
+                    {isPending ? <div className="scale-75 -mx-4 flex items-center justify-center"><Loader /></div> : "Sign Up"}
+                </Button>
             </div>
         </form>
     );
