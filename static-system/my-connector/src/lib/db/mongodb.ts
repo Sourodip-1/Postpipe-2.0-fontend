@@ -88,6 +88,13 @@ export class MongoAdapter implements DatabaseAdapter {
       console.warn(`[MongoAdapter] -> Payload requested env var ${envVarName} but it's MISSING.`);
     }
 
+    // NEW: Direct Environment Variable Match
+    // If the targetName itself is an environment variable name, use it.
+    if (targetName && process.env[targetName]) {
+      console.log(`[MongoAdapter] -> Found via direct env match: ${targetName}`);
+      return process.env[targetName];
+    }
+
     // 2. Dynamic Routing (MONGODB_URI_{TARGET})
     if (targetName) {
       const dynamicKey = `MONGODB_URI_${targetName.toUpperCase()}`;
