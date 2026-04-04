@@ -267,29 +267,140 @@ export class MongoAdapter implements DatabaseAdapter {
       throw new Error(`No MongoDB URI resolved for query. Target: ${options?.targetDatabase}`);
     }
 
-    // 2. Get Client from Pool
     const client = await this.getClient(targetUri);
     const db = client.db(targetDbName);
 
-    // 3. Query Collection
-    // Assuming collection name == formId
     const collection = db.collection(formId);
     console.log(`[MongoAdapter] Fetching from collection: [${formId}]`);
 
+    // Pagination
+    const limit = options?.limit || 50;
+    const page = Math.max(1, options?.page || 1);
+    const skip = (page - 1) * limit;
+
+    // Build filter — exclude soft-deleted by default
+    const filter: Record<string, any> = {};
+    if (!options?.includeDeleted) {
+      filter.is_deleted = { $ne: true };
+    }
+
+    // Smart Search
+    if (options?.search) {
+      filter.$or = [
+        { submissionId: { $regex: options.search, $options: 'i' } },
+        { id: { $regex: options.search, $options: 'i' } }
+      ];
+    }
+
+    // Date range filter
+    if (options?.dateRange) {
+      const now = new Date();
+      let startDate: Date | null = null;
+      if (options.dateRange === '24h') startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      else if (options.dateRange === '7d') startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      else if (options.dateRange === '30d') startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+      if (startDate) {
+        filter.timestamp = { $gte: startDate.toISOString() };
+      }
+    }
+
+    // Support arbitrary extra filters (e.g. {_id: 'xyz'})
+    if (options?.filter) {
+      Object.assign(filter, options.filter);
+    }
+
     const results = await collection
-      .find({})
+      .find(filter)
       .sort({ _receivedAt: -1 })
-      .limit(options?.limit || 50)
+      .skip(skip)
+      .limit(limit)
       .toArray();
 
-    const taggedResults = results.map(doc => ({
-      ...doc,
-      _dbType: 'mongodb',
-      _sourceDb: targetDbName
-    }));
+    const taggedResults = results.map(doc => {
+      const { _id, ...rest } = doc;
+      return {
+        ...rest,
+        id: _id.toString(), // Standardize on 'id' for frontend
+        _id: _id.toString(),
+        submissionId: rest.submissionId || _id.toString(), // Ensure submissionId is always there
+        _dbType: 'mongodb',
+        _sourceDb: targetDbName
+      };
+    });
 
-    console.log(`[MongoAdapter] Query finished. Found ${taggedResults.length} documents.`);
+
+    console.log(`[MongoAdapter] Query finished. Found ${taggedResults.length} documents (page ${page}).`);
     return taggedResults as unknown as PostPipeIngestPayload[];
+  }
+
+  async updateSubmission(formId: string, submissionId: string, patch: Record<string, unknown>, options?: any): Promise<boolean> {
+    const { uri, dbName } = this.getTargetConfig(options as any);
+    console.log(`[MongoAdapter] updateSubmission: formId=${formId}, submissionId=${submissionId}, patch=`, patch);
+    console.log(`[MongoAdapter] Using uri (first 50 chars): ${uri ? uri.substring(0, 50) : 'undefined'}, dbName=${dbName}`);
+    if (!uri) throw new Error('[MongoAdapter] No URI for updateSubmission');
+
+    const client = await this.getClient(uri);
+    const db = client.db(dbName);
+    const collection = db.collection(formId);
+
+    // Build $set using dot-notation keys to correctly partial-update the 'data' field
+    const setOps: Record<string, any> = { updated_at: new Date().toISOString() };
+    for (const [key, value] of Object.entries(patch)) {
+      setOps[`data.${key}`] = value;
+    }
+    console.log(`[MongoAdapter] setOps =`, setOps);
+
+
+
+    // Resolve _id if it's a valid hex string for Mongo, as backup for submissionId
+    let queryFilter: any = { submissionId };
+    try {
+        if (submissionId.length === 24) {
+            const { ObjectId } = require('mongodb');
+            queryFilter = {
+                $or: [
+                    { submissionId },
+                    { _id: new ObjectId(submissionId) }
+                ]
+            };
+        }
+    } catch (e) { /* not an objectid */ }
+    console.log(`[MongoAdapter] queryFilter =`, queryFilter);
+
+    const result = await collection.updateOne(
+      { ...queryFilter, is_deleted: { $ne: true } },
+      { $set: setOps }
+    );
+
+
+    console.log(`[MongoAdapter] updateSubmission: matched=${result.matchedCount} modified=${result.modifiedCount} upsertedId=${result.upsertedId}`);
+    if (result.matchedCount === 0) {
+        console.warn(`[MongoAdapter] UPDATE FAILED: No document matched filter:`, JSON.stringify(queryFilter));
+    }
+    return result.matchedCount > 0;
+  }
+
+  async deleteSubmission(formId: string, submissionId: string, hard: boolean, options?: any): Promise<boolean> {
+    const { uri, dbName } = this.getTargetConfig(options as any);
+    if (!uri) throw new Error('[MongoAdapter] No URI for deleteSubmission');
+
+    const client = await this.getClient(uri);
+    const db = client.db(dbName);
+    const collection = db.collection(formId);
+
+    if (hard) {
+      const result = await collection.deleteOne({ submissionId });
+      console.log(`[MongoAdapter] Hard delete submissionId=${submissionId}: deleted=${result.deletedCount}`);
+      return result.deletedCount > 0;
+    } else {
+      const result = await collection.updateOne(
+        { submissionId },
+        { $set: { is_deleted: true, deleted_at: new Date().toISOString() } }
+      );
+      console.log(`[MongoAdapter] Soft delete submissionId=${submissionId}: matched=${result.matchedCount}`);
+      return result.matchedCount > 0;
+    }
   }
 
   // --- AUTH METHODS ---

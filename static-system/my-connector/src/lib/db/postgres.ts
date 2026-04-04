@@ -117,10 +117,18 @@ export class PostgresAdapter implements DatabaseAdapter {
                         submission_id TEXT UNIQUE NOT NULL,
                         data JSONB NOT NULL,
                         timestamp TIMESTAMPTZ NOT NULL,
+                        is_deleted BOOLEAN DEFAULT FALSE,
+                        deleted_at TIMESTAMPTZ,
+                        updated_at TIMESTAMPTZ,
                         created_at TIMESTAMPTZ DEFAULT NOW()
                     );
                 `;
                 await pool.query(createTableQuery);
+
+                // Add soft-delete columns to existing tables (idempotent)
+                await pool.query(`ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE`).catch(() => {});
+                await pool.query(`ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`).catch(() => {});
+                await pool.query(`ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ`).catch(() => {});
 
                 const indexName = `idx_form_id_${tableName.replace('public.', '')}`;
                 const createIndexQuery = `
@@ -227,23 +235,48 @@ export class PostgresAdapter implements DatabaseAdapter {
         const alias = options?.targetDatabase || options?.targetDb;
         const dbName = options?.databaseConfig?.dbName;
         if (!connectionString) throw new Error("[PostgresAdapter] Cannot query: No connection string.");
-        
+
         const pool = await this.getPool(connectionString, alias, dbName);
-        
         const tableName = this.getTableName(alias, dbName);
+
+        // Pagination
         const limit = options?.limit || 50;
+        const page = Math.max(1, options?.page || 1);
+        const offset = (page - 1) * limit;
+
+        // Soft-delete filter
+        const deletedFilter = options?.includeDeleted ? '' : 'AND (is_deleted IS NULL OR is_deleted = FALSE)';
+
+        // Smart Search Filter
+        let searchFilter = '';
+        const queryParams: any[] = [formId, limit, offset];
+        let paramIdx = 4;
+
+        if (options?.search) {
+            searchFilter = `AND (submission_id ILIKE $${paramIdx} OR data::text ILIKE $${paramIdx})`;
+            queryParams.push(`%${options.search}%`);
+            paramIdx++;
+        }
+
+        // Date range filter
+        let dateFilter = '';
+        if (options?.dateRange) {
+            if (options.dateRange === '24h') dateFilter = "AND timestamp > NOW() - INTERVAL '1 day'";
+            else if (options.dateRange === '7d') dateFilter = "AND timestamp > NOW() - INTERVAL '7 days'";
+            else if (options.dateRange === '30d') dateFilter = "AND timestamp > NOW() - INTERVAL '30 days'";
+        }
+
         const query = `
-            SELECT submission_id as "submissionId", data, timestamp, form_id as "formId"
+            SELECT submission_id as "submissionId", data, timestamp, form_id as "formId", is_deleted, deleted_at, updated_at
             FROM ${tableName}
-            WHERE form_id = $1
+            WHERE form_id = $1 ${deletedFilter} ${searchFilter} ${dateFilter}
             ORDER BY timestamp DESC
-            LIMIT $2;
+            LIMIT $2 OFFSET $3;
         `;
-        
-        const res = await pool.query(query, [formId, limit]);
-        
+
+        const res = await pool.query(query, queryParams);
+
         return res.rows.map(row => {
-            // Safely parse `data` if it was stored as a JSON string (TEXT column or old rows)
             let parsedData = row.data;
             if (typeof parsedData === 'string') {
                 try { parsedData = JSON.parse(parsedData); } catch { /* leave as string */ }
@@ -256,6 +289,65 @@ export class PostgresAdapter implements DatabaseAdapter {
                 _sourceDb: alias || 'default'
             };
         });
+    }
+
+    async updateSubmission(formId: string, submissionId: string, patch: Record<string, unknown>, options?: any): Promise<boolean> {
+        const connectionString = this.resolveConnectionString(options);
+        const alias = options?.targetDatabase || options?.targetDb;
+        const dbName = options?.databaseConfig?.dbName;
+        
+        console.log(`[PostgresAdapter] updateSubmission: formId=${formId}, submissionId=${submissionId}, targetDb=${alias}`);
+        console.log(`[PostgresAdapter] connectionString (first 50): ${connectionString ? connectionString.substring(0, 50) : 'undefined'}`);
+        console.log(`[PostgresAdapter] patch=`, patch);
+        
+        if (!connectionString) throw new Error("[PostgresAdapter] Cannot update: No connection string.");
+
+        const pool = await this.getPool(connectionString, alias, dbName);
+        const tableName = this.getTableName(alias, dbName);
+
+        // Use JSONB || to merge only the provided fields — true partial update
+        // We ensure we merge directly into the data column
+        const result = await pool.query(`
+            UPDATE ${tableName}
+            SET data = data || $1::jsonb, updated_at = NOW()
+            WHERE submission_id = $2 AND (is_deleted IS NULL OR is_deleted = FALSE)
+            RETURNING submission_id;
+        `, [JSON.stringify(patch), submissionId]);
+
+
+        console.log(`[PostgresAdapter] updateSubmission submissionId=${submissionId}: rowsAffected=${result.rowCount}`);
+        if ((result.rowCount ?? 0) === 0) {
+            console.warn(`[PostgresAdapter] UPDATE FAILED: No row found for submissionId=${submissionId} in table ${tableName}`);
+        }
+        return (result.rowCount ?? 0) > 0;
+    }
+
+    async deleteSubmission(formId: string, submissionId: string, hard: boolean, options?: any): Promise<boolean> {
+        const connectionString = this.resolveConnectionString(options);
+        const alias = options?.targetDatabase || options?.targetDb;
+        const dbName = options?.databaseConfig?.dbName;
+        if (!connectionString) throw new Error("[PostgresAdapter] Cannot delete: No connection string.");
+
+        const pool = await this.getPool(connectionString, alias, dbName);
+        const tableName = this.getTableName(alias, dbName);
+
+        if (hard) {
+            const result = await pool.query(
+                `DELETE FROM ${tableName} WHERE submission_id = $1 RETURNING submission_id;`,
+                [submissionId]
+            );
+            console.log(`[PostgresAdapter] Hard delete submissionId=${submissionId}: rows=${result.rowCount}`);
+            return (result.rowCount ?? 0) > 0;
+        } else {
+            const result = await pool.query(`
+                UPDATE ${tableName}
+                SET is_deleted = TRUE, deleted_at = NOW()
+                WHERE submission_id = $1
+                RETURNING submission_id;
+            `, [submissionId]);
+            console.log(`[PostgresAdapter] Soft delete submissionId=${submissionId}: rows=${result.rowCount}`);
+            return (result.rowCount ?? 0) > 0;
+        }
     }
 
     // --- AUTH METHODS ---

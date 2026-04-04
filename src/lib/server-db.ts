@@ -37,6 +37,11 @@ export interface FormField {
   name: string;
   type: string;    // text, email, number, etc.
   required: boolean;
+  isRelationalSource?: boolean; // Toggled on to make this field a target for references
+  reference?: {
+    collection: string;      // Target collection/form to reference
+    displayField?: string;   // The field to display in the dropdown
+  };
 }
 
 export interface RoutingConfig {
@@ -62,9 +67,13 @@ export interface Form {
   createdAt: string;
   userId?: string; // The user who owns this form
   status: 'Live' | 'Paused';
-  submissions?: Submission[];
   submissionCount?: number;
+  is_deleted?: boolean;
+  deleted_at?: string;
+  submissions?: Submission[]; // Legacy support: stored in user_forms
 }
+
+
 
 export interface Submission {
   id: string;
@@ -256,7 +265,8 @@ export async function createForm(connectorId: string, name: string, fields: Form
     fields,
     createdAt: new Date().toISOString(),
     status: 'Live',
-    userId
+    userId,
+    is_deleted: false
   };
 
   await db.collection<UserFormsDocument>('user_forms').updateOne(
@@ -344,13 +354,15 @@ export async function getForms(userId?: string): Promise<Form[]> {
   if (!userId) return [];
 
   const res = await db.collection<UserFormsDocument>('user_forms').findOne({ userId });
-  return res?.forms || [];
+  // Exclude soft-deleted forms
+  return (res?.forms || []).filter(f => !f.is_deleted);
 }
+
 
 export async function getForm(id: string): Promise<Form | undefined> {
   const db = await getDB();
   const res = await db.collection<UserFormsDocument>('user_forms').findOne(
-    { "forms.id": id },
+    { forms: { $elemMatch: { id: id, is_deleted: { $ne: true } } } },
     { projection: { "forms.$": 1 } }
   );
 
@@ -418,7 +430,8 @@ export async function deleteConnector(id: string, userId?: string): Promise<void
 
     await db.collection('user_forms').updateMany(
       formFilter,
-      { $pull: { forms: { connectorId: id } } as any }
+      { $set: { "forms.$[elem].is_deleted": true, "forms.$[elem].deleted_at": new Date().toISOString() } },
+      { arrayFilters: [{ "elem.connectorId": id }] }
     );
   }
 }
@@ -427,9 +440,10 @@ export async function deleteForm(id: string): Promise<void> {
   const db = await getDB();
   await db.collection('user_forms').updateOne(
     { "forms.id": id },
-    { $pull: { forms: { id } } as any }
+    { $set: { "forms.$.is_deleted": true, "forms.$.deleted_at": new Date().toISOString() } }
   );
 }
+
 
 // --- Systems (User Backend Systems) ---
 export async function createSystem(name: string, type: string, templateId?: string, userId?: string): Promise<System> {
@@ -485,6 +499,7 @@ export async function getUserUsageStats(userId: string) {
 
   let totalSubmissions = 0;
   forms.forEach(f => {
+    totalSubmissions += (f.submissionCount || 0);
     if (f.submissions) {
       totalSubmissions += f.submissions.length;
     }

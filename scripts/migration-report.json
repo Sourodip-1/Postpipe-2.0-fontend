@@ -1,0 +1,13 @@
+{
+  "scannedForms": 7,
+  "detectedRelations": 4,
+  "changesApplied": 0,
+  "potentialConflicts": [
+    "Field 'main id' in form 'All test' looks like a foreign key, but no target collection 'main id' was found.",
+    "Field 'product-id' in form 'Benterprise-Products' looks like a foreign key, but no target collection 'product-id' was found.",
+    "Field 'category_id' in form 'Benterprise-Products' looks like a foreign key, but no target collection 'category' was found.",
+    "Field 'catagory-id' in form 'Benterprise-Catagories' looks like a foreign key, but no target collection 'catagory-id' was found."
+  ],
+  "upgradedFields": [],
+  "details": []
+}

@@ -50,13 +50,47 @@ class MemoryAdapter implements DatabaseAdapter {
     this.store.push(submission);
   }
   async query(formId: string, options?: any): Promise<PostPipeIngestPayload[]> {
+    const limit = options?.limit || 50;
+    const page = Math.max(1, options?.page || 1);
+    const skip = (page - 1) * limit;
+
     const results = this.store
-      .filter(s => (s as any).formId === formId)
+      .filter(s => {
+        const matchesForm = (s as any).formId === formId;
+        const isDeleted = (s as any).is_deleted === true;
+        const shouldShow = options?.includeDeleted ? true : !isDeleted;
+        return matchesForm && shouldShow;
+      })
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-    const limit = options?.limit || 50;
-    return results.slice(0, limit);
+    return results.slice(skip, skip + limit);
   }
+
+  async updateSubmission(formId: string, submissionId: string, patch: Record<string, unknown>): Promise<boolean> {
+    const index = this.store.findIndex(s => s.submissionId === submissionId && s.formId === formId);
+    if (index === -1) return false;
+
+    this.store[index] = {
+      ...this.store[index],
+      data: { ...this.store[index].data, ...patch },
+      updated_at: new Date().toISOString()
+    } as any;
+    return true;
+  }
+
+  async deleteSubmission(formId: string, submissionId: string, hard: boolean): Promise<boolean> {
+    const index = this.store.findIndex(s => s.submissionId === submissionId && s.formId === formId);
+    if (index === -1) return false;
+
+    if (hard) {
+      this.store.splice(index, 1);
+    } else {
+      (this.store[index] as any).is_deleted = true;
+      (this.store[index] as any).deleted_at = new Date().toISOString();
+    }
+    return true;
+  }
+
 
   // Auth methods
   private users: any[] = [];
