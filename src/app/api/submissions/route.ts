@@ -21,146 +21,74 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        // 3. Get Form
         const form = await getForm(formId);
         if (!form) {
             return NextResponse.json({ status: "error", error: "Form not found" }, { status: 404 });
         }
 
-        // Ensure user owns this form
         if (form.userId !== session.userId) {
             return NextResponse.json({ status: "error", error: "Forbidden" }, { status: 403 });
         }
 
-        // 4. Get Connector
-        console.log(`[API] Connector lookup for Form ${formId}: ${form.connectorId}`);
         const connector = await getConnector(form.connectorId);
-        
         if (!connector) {
             return NextResponse.json({ status: "error", error: "Connector not found" }, { status: 404 });
         }
 
-        if (!connector.secret) {
-            console.error(`[API] Critical: Connector ${connector.id} has no valid secret.`);
-            return NextResponse.json({ status: "error", error: "Connector configuration error (missing secret)" }, { status: 500 });
-        }
+        // Pagination/Filtering
+        const limit = url.searchParams.get("limit") || "100";
+        const page = url.searchParams.get("page") || "1";
+        const includeDeleted = url.searchParams.get("includeDeleted") || "false";
+        const filterStr = url.searchParams.get("filter");
+        const search = url.searchParams.get("search");
+        const dateRange = url.searchParams.get("dateRange");
 
-        // 5. Build connection map (User DB Config vs Connector DB Config)
-        let databaseConfig = null;
+        // Resolve Target Database
         const target = form.targetDatabase || "default";
-
-        // Try user global config first
-        if (form.userId) {
-            const userConfig = await getUserDatabaseConfig(form.userId);
-            if (userConfig?.databases?.[target]) {
-                databaseConfig = userConfig.databases[target];
-            }
-        }
-
-        // Fallback to connector config
-        if (!databaseConfig && connector.databases?.[target]) {
+        const userConfig = await getUserDatabaseConfig(form.userId || "");
+        
+        let databaseConfig = null;
+        if (userConfig?.databases?.[target]) {
+            databaseConfig = userConfig.databases[target];
+        } else if (connector.databases?.[target]) {
             databaseConfig = connector.databases[target];
         }
 
-        // Build list of all multi-node targets to fetch from
-        const allTargets = new Map<string, any>();
-        allTargets.set(target, databaseConfig || {});
-
-        const userConfig = await getUserDatabaseConfig(form.userId || "");
-        if (userConfig?.databases) {
-            Object.entries(userConfig.databases).forEach(([alias, config]) => allTargets.set(alias, config));
+        // Fetch from Connector
+        const queryParams = new URLSearchParams({
+            formId: form.id,
+            limit,
+            page,
+            targetDatabase: target,
+            includeDeleted
+        });
+        if (search) queryParams.set("search", search);
+        if (dateRange) queryParams.set("dateRange", dateRange);
+        if (databaseConfig) {
+            queryParams.set("databaseConfig", JSON.stringify(databaseConfig));
         }
-        if (connector.databases) {
-            Object.entries(connector.databases).forEach(([alias, config]) => allTargets.set(alias, config));
+        if (filterStr) {
+            queryParams.set("filter", filterStr);
         }
 
-        // 6. Fetch from Connector Adapter
-        console.log(`[API] Firing fetch requests to Connector ${connector.url} for ${allTargets.size} configured targets`);
-        const MAX_RETRIES = 3;
+        const baseUrl = ensureFullUrl(connector.url);
+        const fetchUrl = `${baseUrl}/postpipe/data?${queryParams.toString()}`;
 
-        const fetchWithRetry = async (targetAlias: string, targetConfig: any, attempt: number = 0): Promise<any> => {
-            const queryParams = new URLSearchParams({
-                formId: form.id,
-                limit: "100",
-                targetDatabase: targetAlias,
-                databaseConfig: JSON.stringify(targetConfig) // Pass dynamic config to connector
-            });
-
-            const baseUrl = ensureFullUrl(connector.url);
-            const fetchUrl = `${baseUrl}/postpipe/data?${queryParams.toString()}`;
-
-            try {
-                const res = await fetch(fetchUrl, {
-                    headers: { Authorization: `Bearer ${connector.secret}` },
-                    cache: 'no-store'
-                });
-
-                if (res.ok) {
-                    const data = await res.json();
-                    return { ok: true, data: data.data || [] };
-                }
-                if (res.status === 401 || res.status === 403) {
-                    return { ok: false, error: "AuthFailed" };
-                }
-                
-                throw new Error(`Connector Error: ${res.status}`);
-            } catch (err: any) {
-                // SSL Fallback
-                const errMsg = String(err);
-                if ((errMsg.includes('ssl') || errMsg.includes('certificate') || errMsg.includes('ECONNREFUSED')) && fetchUrl.startsWith('https://')) {
-                    const fallbackUrl = fetchUrl.replace(/^https:\/\//, 'http://');
-                    const res = await fetch(fallbackUrl, {
-                        headers: { Authorization: `Bearer ${connector.secret}` },
-                        cache: 'no-store'
-                    });
-                    if (res.ok) {
-                        const data = await res.json();
-                        return { ok: true, data: data.data || [] };
-                    }
-                }
-
-                if (attempt < MAX_RETRIES) {
-                    await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt)));
-                    return fetchWithRetry(targetAlias, targetConfig, attempt + 1);
-                }
-                return { ok: false, error: err.message };
-            }
-        };
-
-        const fetchPromises = Array.from(allTargets.entries()).map(([alias, config]) => {
-            return fetchWithRetry(alias, config);
+        const res = await fetch(fetchUrl, {
+            headers: { Authorization: `Bearer ${connector.secret}` },
+            cache: 'no-store'
         });
 
-        // 7. Aggregate records securely
-        const results = await Promise.all(fetchPromises);
-        let mergedRecords: any[] = [];
-        let authFailed = false;
-
-        for (const result of results) {
-            if (result.ok && Array.isArray(result.data)) {
-                mergedRecords = [...mergedRecords, ...result.data];
-            } else if (!result.ok && result.error === "AuthFailed") {
-                authFailed = true;
-            }
+        if (!res.ok) {
+            const errText = await res.text();
+            return NextResponse.json({ status: "error", error: "Connector error", details: errText }, { status: res.status });
         }
 
-        if (authFailed && mergedRecords.length === 0) {
-            return NextResponse.json({ status: "error", error: "Connector Authentication Failed" }, { status: 401 });
-        }
-
-        // Sort descending by timestamp
-        mergedRecords.sort((a, b) => {
-            const dateA = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
-            const dateB = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
-            return dateB - dateA;
-        });
-
-        console.log(`[API] Successfully retrieved ${mergedRecords.length} records. Sending to client.`);
-        
-        // 8. Return JSON
+        const data = await res.json();
         return NextResponse.json({
             status: "success",
-            records: mergedRecords
+            records: data.data || [],
+            count: data.count || 0
         });
 
     } catch (e: any) {
@@ -168,3 +96,97 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ status: "error", error: "Internal Server Error" }, { status: 500 });
     }
 }
+
+export async function PATCH(req: NextRequest) {
+    console.log("[API] PATCH /api/submissions called");
+    const session = await getSession();
+    if (!session || !session.userId) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    try {
+        const body = await req.json();
+        console.log("[API] PATCH body:", JSON.stringify(body));
+        const { submissionId, formId, patch } = body;
+
+        if (!submissionId || !formId || !patch) {
+            return NextResponse.json({ error: "submissionId, formId, and patch are required" }, { status: 400 });
+        }
+
+        const form = await getForm(formId);
+        if (!form || form.userId !== session.userId) {
+            return NextResponse.json({ error: "Form not found or unauthorized" }, { status: 404 });
+        }
+
+        const connector = await getConnector(form.connectorId);
+        if (!connector) return NextResponse.json({ error: "Connector not found" }, { status: 404 });
+
+        const target = form.targetDatabase || "default";
+        const userConfig = await getUserDatabaseConfig(form.userId || "");
+        const databaseConfig = userConfig?.databases?.[target] || connector.databases?.[target];
+
+        const baseUrl = ensureFullUrl(connector.url);
+        console.log("[API] Calling connector:", `${baseUrl}/postpipe/data/${submissionId}`, "method: PATCH");
+        
+        const res = await fetch(`${baseUrl}/postpipe/data/${submissionId}`, {
+            method: 'PATCH',
+            headers: { 
+                'Authorization': `Bearer ${connector.secret}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ formId, patch, targetDatabase: target, databaseConfig })
+        });
+
+        const result = await res.json();
+        console.log("[API] Connector response:", JSON.stringify(result), "status:", res.status);
+        return NextResponse.json(result, { status: res.status });
+    } catch (e) {
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    }
+}
+
+export async function DELETE(req: NextRequest) {
+    const session = await getSession();
+    if (!session || !session.userId) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    try {
+        const url = new URL(req.url);
+        const submissionId = url.searchParams.get("submissionId");
+        const formId = url.searchParams.get("formId");
+        const hard = url.searchParams.get("hard") === 'true';
+
+        if (!submissionId || !formId) {
+            return NextResponse.json({ error: "submissionId and formId are required" }, { status: 400 });
+        }
+
+        const form = await getForm(formId);
+        if (!form || form.userId !== session.userId) {
+            return NextResponse.json({ error: "Form not found or unauthorized" }, { status: 404 });
+        }
+
+        const connector = await getConnector(form.connectorId);
+        if (!connector) return NextResponse.json({ error: "Connector not found" }, { status: 404 });
+
+        const target = form.targetDatabase || "default";
+        const userConfig = await getUserDatabaseConfig(form.userId || "");
+        const databaseConfig = userConfig?.databases?.[target] || connector.databases?.[target];
+
+        const baseUrl = ensureFullUrl(connector.url);
+        const res = await fetch(`${baseUrl}/postpipe/data/${submissionId}`, {
+            method: 'DELETE',
+            headers: { 
+                'Authorization': `Bearer ${connector.secret}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ formId, hard, targetDatabase: target, databaseConfig })
+        });
+
+        const result = await res.json();
+        return NextResponse.json(result, { status: res.status });
+    } catch (e) {
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    }
+}
+

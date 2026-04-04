@@ -443,7 +443,7 @@ app.post('/postpipe/ingest', async (req: Request, res: Response) => {
 // @ts-ignore
 app.get('/postpipe/data', authenticateConnector, async (req: Request, res: Response) => {
     try {
-        const { formId, limit, targetDatabase, databaseConfig } = req.query;
+        const { formId, limit, page, targetDatabase, databaseConfig, includeDeleted, filter } = req.query;
 
         if (!formId) {
             return res.status(400).json({ error: "formId required" });
@@ -459,6 +459,16 @@ app.get('/postpipe/data', authenticateConnector, async (req: Request, res: Respo
             }
         }
 
+        // Parse filter if passed as JSON string
+        let filterParsed = null;
+        if (typeof filter === 'string') {
+            try {
+                filterParsed = JSON.parse(filter);
+            } catch (e) {
+                console.warn("Invalid filter JSON");
+            }
+        }
+
         // Validate targetDatabase (alphanumeric, underscores, hyphens only for safety)
         const dbNameStr = String(targetDatabase || "");
         if (dbNameStr && !/^[a-zA-Z0-9_-]*$/.test(dbNameStr)) {
@@ -466,7 +476,6 @@ app.get('/postpipe/data', authenticateConnector, async (req: Request, res: Respo
         }
 
         // SMART ADAPTER SELECTION
-        // Extract from query or config
         const queryType = req.query.dbType as string;
         const configType = dbConfigParsed?.type;
 
@@ -488,13 +497,82 @@ app.get('/postpipe/data', authenticateConnector, async (req: Request, res: Respo
 
         const data = await adapter.query(String(formId), {
             limit: Number(limit) || 50,
+            page: Number(page) || 1,
             targetDatabase: dbNameStr,
-            databaseConfig: dbConfigParsed
+            databaseConfig: dbConfigParsed,
+            includeDeleted: includeDeleted === 'true',
+            filter: filterParsed || undefined
         });
         return res.json({ success: true, count: data.length, data });
 
     } catch (e) {
         console.error("Fetch Error:", e);
+        return res.status(500).json({ error: "Internal Server Error", details: e instanceof Error ? e.message : String(e) });
+    }
+});
+
+// --- Submission PATCH (Partial Update) ---
+// @ts-ignore
+app.patch('/postpipe/data/:submissionId', authenticateConnector, async (req: Request, res: Response) => {
+    try {
+        const { submissionId } = req.params;
+        const { formId, patch, targetDatabase, databaseConfig } = req.body;
+
+        console.log(`[PATCH] submissionId=${submissionId}, formId=${formId}, targetDatabase=${targetDatabase}`);
+        console.log(`[PATCH] databaseConfig=`, databaseConfig);
+        console.log(`[PATCH] databaseConfig.type=`, databaseConfig?.type);
+
+        if (!formId || !patch || typeof patch !== 'object') {
+            return res.status(400).json({ error: "formId (string) and patch (object) are required" });
+        }
+
+        const dbType = databaseConfig?.type || process.env.DB_TYPE;
+        console.log(`[PATCH] Using dbType: ${dbType}`);
+        const adapter = getAdapter(dbType);
+        await adapter.connect({ databaseConfig, targetDatabase });
+
+        const success = await adapter.updateSubmission(formId, submissionId, patch, {
+            targetDatabase,
+            databaseConfig
+        });
+
+        if (success) {
+            return res.json({ success: true, message: "Submission updated" });
+        } else {
+            return res.status(404).json({ error: "Submission not found or already deleted" });
+        }
+    } catch (e) {
+        console.error("Update Error:", e);
+        return res.status(500).json({ error: "Internal Server Error", details: e instanceof Error ? e.message : String(e) });
+    }
+});
+
+// --- Submission DELETE (Soft/Hard) ---
+// @ts-ignore
+app.delete('/postpipe/data/:submissionId', authenticateConnector, async (req: Request, res: Response) => {
+    try {
+        const { submissionId } = req.params;
+        const { formId, targetDatabase, databaseConfig, hard } = req.body;
+
+        if (!formId) {
+            return res.status(400).json({ error: "formId is required" });
+        }
+
+        const adapter = getAdapter(databaseConfig?.type);
+        await adapter.connect({ databaseConfig, targetDatabase });
+
+        const success = await adapter.deleteSubmission(formId, submissionId, hard === true || hard === 'true', {
+            targetDatabase,
+            databaseConfig
+        });
+
+        if (success) {
+            return res.json({ success: true, message: hard ? "Submission permanently deleted" : "Submission soft-deleted" });
+        } else {
+            return res.status(404).json({ error: "Submission not found" });
+        }
+    } catch (e) {
+        console.error("Delete Error:", e);
         return res.status(500).json({ error: "Internal Server Error", details: e instanceof Error ? e.message : String(e) });
     }
 });
@@ -531,13 +609,75 @@ app.get('/api/postpipe/forms/:formId/submissions', async (req: Request, res: Res
     }
 });
 
+// --- Reference Resolution (Population) Endpoint ---
+// POST /postpipe/resolve
+// Body: { collection: string, ids: string[], targetDatabase?: string }
+// Returns populated records for each provided ID.
+// This enables "eager" reference resolution on the read path.
+// @ts-ignore
+app.post('/postpipe/resolve', authenticateConnector, async (req: Request, res: Response) => {
+    try {
+        const { collection, ids, targetDatabase, databaseConfig: dbConfigBody } = req.body;
+
+        if (!collection || !Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ error: "collection (string) and ids (array) are required" });
+        }
+
+        if (ids.length > 100) {
+            return res.status(400).json({ error: "Maximum 100 IDs per resolution request" });
+        }
+
+        const dbNameStr = String(targetDatabase || "");
+
+        let resolvedType: string | undefined;
+        if (dbNameStr) {
+            const targetLower = dbNameStr.toLowerCase();
+            if (targetLower.includes('postgres') || targetLower.includes('pg') || targetLower.includes('neon')) {
+                resolvedType = 'postgres';
+            } else if (targetLower.includes('mongo') || targetLower.includes('mongodb') || targetLower.includes('atlas')) {
+                resolvedType = 'mongodb';
+            }
+        }
+
+        const adapter = getAdapter(resolvedType as string);
+        await adapter.connect({ databaseConfig: dbConfigBody, targetDatabase: dbNameStr });
+
+        // Query all requested IDs — paginated-safe (client controls batch size)
+        const results: Record<string, any> = {};
+        await Promise.all(
+            ids.map(async (id: string) => {
+                try {
+                    const records = await adapter.query(collection, {
+                        limit: 1,
+                        targetDatabase: dbNameStr,
+                        databaseConfig: dbConfigBody,
+                        filter: { _id: id }
+                    });
+                    if (records && records.length > 0) {
+                        results[id] = records[0];
+                    }
+                } catch {
+                    // Keep null for failed resolutions — backward compat
+                    results[id] = null;
+                }
+            })
+        );
+
+        return res.json({ success: true, resolved: results, count: Object.keys(results).length });
+
+    } catch (e) {
+        console.error("[Resolve] Error:", e);
+        return res.status(500).json({ error: "Internal Server Error", details: e instanceof Error ? e.message : String(e) });
+    }
+});
+
 // --- Diagnostic Catch-All ---
 app.use((req, res) => {
     console.warn(`[404] Route Not Found: ${req.method} ${req.originalUrl} from IP: ${req.ip}`);
     res.status(404).json({
         error: "Not Found",
         message: `Route ${req.originalUrl} does not exist on this connector.`,
-        availableRoutes: ["POST /postpipe/ingest", "GET /postpipe/data", "GET /api/postpipe/forms/:formId/submissions"]
+        availableRoutes: ["POST /postpipe/ingest", "GET /postpipe/data", "GET /api/postpipe/forms/:formId/submissions", "POST /postpipe/resolve"]
     });
 });
 

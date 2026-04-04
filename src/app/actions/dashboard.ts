@@ -175,3 +175,22 @@ export async function deleteAuthPresetAction(id: string) {
   await deleteAuthPreset(session.userId, id);
   return { success: true };
 }
+
+/**
+ * Returns a lightweight list of the user's forms for use as
+ * reference-field collection options in the form builder.
+ */
+export async function getFormsAction() {
+  const session = await getSession();
+  if (!session || !session.userId) return [];
+
+  const forms = await getForms(session.userId);
+  return forms.map((f: any) => ({
+    id: f.id,
+    name: f.name,
+    fields: (f.fields || []).map((field: any) => ({
+      name: field.name,
+      type: field.type,
+    })),
+  }));
+}

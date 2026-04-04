@@ -15,6 +15,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ToastAction } from "@/components/ui/toast";
 import {
     Dialog,
     DialogContent,
@@ -72,6 +73,7 @@ export default function FormsClient({ initialForms = [], initialPresets = [] }: 
     const [expandedFormId, setExpandedFormId] = React.useState<string | null>(null);
     const [copiedId, setCopiedId] = React.useState<string | null>(null);
     const [searchExpanded, setSearchExpanded] = React.useState(false);
+    const pendingDeletions = React.useRef<Record<string, any>>({});
 
 
     const searchParams = useSearchParams();
@@ -116,7 +118,11 @@ export default function FormsClient({ initialForms = [], initialPresets = [] }: 
     });
 
     const [forms, setForms] = React.useState<Form[]>(mapForms(initialForms));
-    React.useEffect(() => { setForms(mapForms(initialForms)); }, [initialForms]);
+    React.useEffect(() => { 
+        const mapped = mapForms(initialForms);
+        // Ensure pending deletions don't reappear if initialForms updates from server
+        setForms(mapped.filter(f => !pendingDeletions.current[f.id])); 
+    }, [initialForms]);
 
     const toggleStatus = async (id: string, e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
@@ -148,15 +154,49 @@ export default function FormsClient({ initialForms = [], initialPresets = [] }: 
 
     const deleteForm = async (id: string, e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
-        try {
-            setForms(prev => prev.filter(f => f.id !== id));
-            await deleteFormAction(id);
-            toast({ title: "Deleted", description: "Endpoint removed." });
-            setExpandedFormId(null);
-            router.refresh();
-        } catch {
-            toast({ title: "Error", description: "Failed to delete", variant: "destructive" });
-        }
+        
+        const formToDelete = forms.find(f => f.id === id);
+        if (!formToDelete) return;
+
+        // Optimistically remove from state
+        setForms(prev => prev.filter(f => f.id !== id));
+        setExpandedFormId(null);
+
+        const performDelete = async () => {
+            try {
+                await deleteFormAction(id);
+                delete pendingDeletions.current[id];
+                router.refresh();
+            } catch {
+                // Restore if failed
+                setForms(prev => [...prev, formToDelete]);
+                toast({ title: "Error", description: "Failed to delete endpoint", variant: "destructive" });
+            }
+        };
+
+        // Delay the actual server action by 5 seconds
+        const timeoutId = setTimeout(performDelete, 5000);
+        pendingDeletions.current[id] = timeoutId;
+
+        toast({
+            title: "Endpoint Deleted",
+            description: `"${formToDelete.name}" has been removed.`,
+            action: (
+                <ToastAction 
+                    altText="Undo deletion" 
+                    onClick={() => {
+                        if (pendingDeletions.current[id]) {
+                            clearTimeout(pendingDeletions.current[id]);
+                            delete pendingDeletions.current[id];
+                            setForms(prev => [...prev, formToDelete]);
+                            toast({ title: "Restored", description: "Endpoint restored successfully." });
+                        }
+                    }}
+                >
+                    Undo
+                </ToastAction>
+            ),
+        });
     };
 
     const deletePreset = async (id: string) => {

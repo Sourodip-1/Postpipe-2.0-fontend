@@ -32,7 +32,9 @@ export interface ConnectorResponse {
 export interface DatabaseAdapter {
   connect(context?: any): Promise<void>;
   insert(submission: PostPipeIngestPayload): Promise<void>;
-  query(formId: string, options?: any): Promise<PostPipeIngestPayload[]>;
+  query(formId: string, options?: QueryOptions): Promise<PostPipeIngestPayload[]>;
+  updateSubmission(formId: string, submissionId: string, patch: Record<string, unknown>, options?: any): Promise<boolean>;
+  deleteSubmission(formId: string, submissionId: string, hard: boolean, options?: any): Promise<boolean>;
   disconnect?(): Promise<void>;
   
   // Auth methods
@@ -42,6 +44,15 @@ export interface DatabaseAdapter {
   updateUserPassword(userId: string, newPasswordHash: string, context?: any): Promise<void>;
   verifyUserEmail(userId: string, context?: any): Promise<void>;
   updateUserOtp(userId: string, otp: string, expiresAt: Date, context?: any): Promise<void>;
+}
+
+export interface QueryOptions {
+  limit?: number;
+  page?: number;        // 1-indexed
+  targetDatabase?: string;
+  databaseConfig?: any;
+  filter?: Record<string, any>;
+  includeDeleted?: boolean;
 }
 
 export interface ConnectorConfig {

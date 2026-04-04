@@ -1,11 +1,12 @@
-export type FieldCategory = 
-  | 'Text' 
-  | 'Numeric' 
-  | 'Boolean' 
-  | 'Media' 
-  | 'Structured' 
-  | 'Selection' 
-  | 'Relational' 
+export type FieldCategory =
+  | 'Text'
+  | 'Numeric'
+  | 'Boolean'
+  | 'Media'
+  | 'Structured'
+  | 'Selection'
+  | 'Relational'
+  | 'Reference'
   | 'Temporal';
 
 export interface FieldTypeConfig {
@@ -88,18 +89,16 @@ export const FIELD_TYPES: Record<string, FieldTypeConfig> = {
     category: "Selection",
     component: "SelectInput"
   },
-  uuid: {
-    value: "uuid",
-    label: "UUID (Primary Key)",
-    category: "Relational",
-    component: "UuidInput"
+  // ── Reference / Relational types ─────────────────────────────────────────
+  // When a field is one of these types, the form builder shows the
+  // ReferenceFieldConfig panel (collection picker + options).
+  reference: {
+    value: "reference",
+    label: "Relational Data 🔗",
+    category: "Reference",
+    component: "ReferenceInput"
   },
-  foreign_key: {
-    value: "foreign_key",
-    label: "Foreign Key",
-    category: "Relational",
-    component: "ForeignKeyInput"
-  },
+  // ── Temporal ─────────────────────────────────────────────────────────────
   datetime: {
     value: "datetime",
     label: "Date & Time",
@@ -111,13 +110,13 @@ export const FIELD_TYPES: Record<string, FieldTypeConfig> = {
 // Helper to get grouped types for UI dropdowns
 export function getGroupedFieldTypes(): Record<FieldCategory, FieldTypeConfig[]> {
   const groups: Record<string, FieldTypeConfig[]> = {};
-  
+
   Object.values(FIELD_TYPES).forEach(config => {
     if (!groups[config.category]) {
       groups[config.category] = [];
     }
     groups[config.category].push(config);
   });
-  
+
   return groups as Record<FieldCategory, FieldTypeConfig[]>;
 }
