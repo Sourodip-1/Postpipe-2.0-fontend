@@ -18,8 +18,6 @@ The PostPipe architecture consists of three main components:
 2.  **The Connector**: A self-hosted, lightweight Node.js secure agent that lives next to your database (on your laptop, server, or cloud VPC). It connects outbound to PostPipe SaaS using a secure ID and Secret.
 3.  **The Browser**: The client-side interface that initiates requests.
 
-testing
-
 ### The Zero Trust Flow
 
 1.  **Request**: User initiates a request (e.g., submits a form) via the Browser to PostPipe SaaS.
